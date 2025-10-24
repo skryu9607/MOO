@@ -23,11 +23,18 @@ class Vertex:
     def position(self):
         # For compatibility with older functions, return only (x, y)
         return self.state[:2]
-        
+    def angle(self):
+        return self.state[2]
+    
     def __repr__(self):
         return f"Vertex({self.state})"
 
 class Tree:
+    """
+    Represents a single tree in the fores
+    
+    """
+    
     """
     Represents a single tree in the forest.
     It stores the parent of each vertex, the cost to reach it,
