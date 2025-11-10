@@ -52,7 +52,8 @@
         "__tree": "cpp",
         "fstream": "cpp",
         "iomanip": "cpp",
-        "unordered_set": "cpp"
+        "unordered_set": "cpp",
+        "list": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

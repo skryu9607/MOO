@@ -13,6 +13,7 @@
 #include <fstream>
 #include <map>
 #include <stdexcept> 
+#include <queue>
 
 // Basic constatns // 
 double PI = 3.14159265358979323846;
@@ -224,7 +225,7 @@ class MORRFplanner{
                     candidates_nodes.push_back(node);
                     std::cout << "candidate node ID: " << node->id << " at distance " << dist << std::endl;
                     std::cout << "z_utop: " << z_utop[0] << ", " << z_utop[1] << std::endl;
-                    double current_min_fitness = calculateTchebycheffFitness(tree.getCost(node->id), lambdas[k], z_utop);
+                    double current_min_fitness = calculateTchebycheffFitness(tree.getCost(node->id) + calculateSegmentCost(node->state,goal), lambdas[k], z_utop);
                     //double current_min_fitness = tree.fitness_map.at(node->id);
                     //std::cout << "size of fitness_map: " << tree.fitness_map.size() << std::endl;
                     if (current_min_fitness < min_fitness){
@@ -300,7 +301,8 @@ class MORRFplanner{
 
     }
     void run(int max_iterations);
-    void saveTreesToTxt(const std::string& prefix = "tree_data") const;
+    void saveParentMapToTxt(const std::string& prefix = "tree_data") const;
+    void saveChildrenMapToTxt(const std::string& prefix) const;
     private: 
     // Need to be protected.
     std::vector<std::shared_ptr<Node>> G_nodes;
@@ -312,7 +314,7 @@ class MORRFplanner{
     std::vector<double> z_utop = {0.0,0.0};
 
 };
-void MORRFplanner::saveTreesToTxt(const std::string& prefix) const {
+void MORRFplanner::saveParentMapToTxt(const std::string& prefix) const {
     // Subproblem Trees -> .txt file
     for (size_t i = 0; i < subproblem_trees.size(); ++i) {
         std::string filename = prefix + "_subproblem_" + std::to_string(i) + ".txt";
@@ -325,8 +327,6 @@ void MORRFplanner::saveTreesToTxt(const std::string& prefix) const {
         file << "Parent Map for Subproblem Tree " << i << std::endl;
         file << "======================================" << std::endl;
         file << "Child ID (x, y) -> Parent ID (x, y)" << std::endl;
-        
-        // 
         for (const auto& [child_id, parent_id] : subproblem_trees[i].parent_map) {
             if (child_id < G_nodes.size() && parent_id < G_nodes.size()) {
                 const State& child_state = G_nodes[child_id]->state;
@@ -343,6 +343,51 @@ void MORRFplanner::saveTreesToTxt(const std::string& prefix) const {
         
         file.close();
         std::cout << "Saved parent map with states to " << filename << std::endl;
+    }
+};
+void MORRFplanner::saveChildrenMapToTxt(const std::string& prefix) const {
+    // Subproblem Trees -> .txt file (Children Map 저장)
+    for (size_t i = 0; i < subproblem_trees.size(); ++i) {
+        // 파일 이름이 겹치지 않도록 "children" 명시
+        std::string filename = prefix + "_subproblem_children_" + std::to_string(i) + ".txt";
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Error: Could not open " << filename << std::endl;
+            continue;
+        }
+
+        file << "Children Map for Subproblem Tree " << i << std::endl;
+        file << "======================================" << std::endl;
+        file << "Parent ID (x, y) -> [List of Children IDs (x, y)]" << std::endl;
+        
+        // 해당 트리의 children_map을 가져옵니다.
+        const auto& children_map = subproblem_trees[i].children_map;
+
+        // children_map을 순회합니다. (key: parent_id, value: vector<int> children_list)
+        for (const auto& [parent_id, children_list] : children_map) {
+            // G_nodes에서 부모 노드 정보 확인
+            if (parent_id >= G_nodes.size()) continue; 
+            const State& parent_state = G_nodes[parent_id]->state;
+
+            // 부모 노드 정보 출력
+            file << "    " << parent_id 
+                 << " (" << parent_state.x << ", " << parent_state.y << ") -> [ ";
+
+            // 자식 노드 리스트 순회
+            for (int child_id : children_list) {
+                // G_nodes에서 자식 노드 정보 확인
+                if (child_id < G_nodes.size()) {
+                    const State& child_state = G_nodes[child_id]->state;
+                    file << child_id << " (" << child_state.x << ", " << child_state.y << "); ";
+                } else {
+                    file << child_id << " (State N/A); ";
+                }
+            }
+            file << "]" << std::endl; // 한 줄 마무리
+        }
+        
+        file.close();
+        std::cout << "Saved children map with states to " << filename << std::endl;
     }
 };
 State sampleState(){
@@ -383,62 +428,46 @@ Trajectory line(const State& s_from, const State& s_to){
     return traj;
 }
 bool isObstacleFree(const Trajectory& traj){
+    
+    
     return true;
 }
-void propagateCostToChildren(Tree& tree, int parent_id) {
-    
-    double parent_cost = tree.cost_map[parent_id];
+void propagateCostToChildren(Tree& tree, int parent_id, const std::vector<std::shared_ptr<Node>>& G_nodes) {
+    std::queue<int> q;
+    q.push(parent_id);
+    // Using BFS
+    while(!q.empty()){
+        int parent_id = q.front();
+        q.pop();
+        std::vector<double> parent_cost = tree.cost_map[parent_id];
+        if (tree.children_map.count(parent_id) == 0) {
+            continue; 
+        }
+        for (int child_id : tree.children_map[parent_id]){
+            std::vector<double> segment_cost = calculateSegmentCost(G_nodes[parent_id]->state, G_nodes[child_id]->state);
+            std::vector<double> new_child_cost = parent_cost + segment_cost;
 
-    if (tree.children_map.count(parent_id) == 0) {
-        return; 
-    }
+            tree.cost_map[child_id] = new_child_cost;
 
-    for (int child_id : tree.children_map[parent_id]) {
-        
-        double segment_cost = calculateSegmentCost(G_nodes[parent_id]->state, G_nodes[child_id]->state);
-        double new_child_cost = parent_cost + segment_cost;
+            //std::cout << "Propagated cost to Child ID " << child_id << ": " << std::endl;
+            q.push(child_id);
 
-        tree.cost_map[child_id] = new_child_cost;
-        propagateCostToChildren(tree, child_id);
+        }
     }
 }
 
-void printParentMap(const std::map<int, int>& parent_map, const std::string& tree_name) {
-    std::cout << "--- Printing Parent Map for: " << tree_name << " ---" << std::endl;
-    if (parent_map.empty()) {
-        std::cout << "Map is empty." << std::endl;
-        return;
-    }
-    // C++17 structured binding
-    for (const auto& [child, parent] : parent_map) {
-        std::cout << "  Node " << child << " -> (Parent) " << parent << std::endl;
-    }
-    std::cout << "-----------------------------------------" << std::endl;
-}
-void printChildrenMap(const std::map<int, std::vector<int>>& children_map, const std::string& tree_name) {
-    std::cout << "--- Printing Children Map for: " << tree_name << " ---" << std::endl;
-    if (children_map.empty()) {
-        std::cout << "Map is empty." << std::endl;
-        return;
-    }
-    // C++17 structured binding
-    for (int child_id : tree.children_map[parent_id]) {
-        std::cout << "  Parent_id : " << parent_id << " -> Children " << child_id << std::endl;
-    }
-    std::cout << "-----------------------------------------" << std::endl;
-}
 //std::vector<std::shared_ptr<Node>> MORRFplanner::ExtendTrees(G_nodes,)
 void MORRFplanner::run(int max_iterations){
     // Tree Initialization is done
     // Start the main loop
     for (size_t i = 0; i < max_iterations; ++i){
         State x_rand = sampleState();
-        std::cout << "------ Iteration " << i << " | Sampled State: (" << x_rand.x << ", " << x_rand.y << ")" << std::endl;
-        double radius = 30.0 * std::sqrt((std::log(G_nodes.size() + 1.0) / (G_nodes.size() + 1.0)));
+        //std::cout << "------ Iteration " << i << " | Sampled State: (" << x_rand.x << ", " << x_rand.y << ")" << std::endl;
+        double search_radius = 30.0 * std::sqrt((std::log(G_nodes.size() + 1.0) / (G_nodes.size() + 1.0)));
         
-        //double radius =  5.0;
-        std::shared_ptr<Node> NstNode = getNearestNode(x_rand,radius);
-        std::cout<<"NstNode ID: " << NstNode->id << std::endl;
+        //double search_radius =  5.0;
+        std::shared_ptr<Node> NstNode = getNearestNode(x_rand,search_radius);
+        //std::cout<<"NstNode ID: " << NstNode->id << std::endl;
         
         const State& new_state = steer(NstNode->state, x_rand);
 
@@ -458,18 +487,17 @@ void MORRFplanner::run(int max_iterations){
                 int id_min = NstNode->id; // Line 3
 
                 tree.parent_map[new_node->id] = NstNode->id; // Line 3
-                tree.children_map[NstNode->id].push_back(new_node->id); // For cost propagation
+                //tree.children_map[NstNode->id].push_back(new_node->id); // For cost propagation
                 tree.cost_map[NstNode->id] = tree.getCost(NstNode->id); // Line 3
                 tree.cost_map[new_node->id] = tree.cost_map[NstNode->id] + calculateSegmentCost(NstNode->state,new_node->state); // Line 3
                 
-                std::vector<std::shared_ptr<Node>> NrNodes = getNearNodes(x_min, radius); // Line 4
+                std::vector<std::shared_ptr<Node>> NrNodes = getNearNodes(new_node->state, search_radius); // Line 4
                 for (std::shared_ptr<Node> NrNode:NrNodes){ // Line 5
                     if (isObstacleFree(line(new_node->state, NrNode->state))){ // Line 6
 
-                        double ck_new = tree.getCost(NrNode->id)[k] // Line 7
-                        + calculateSegmentCost(NrNode->state,new_node->state)[k];
-                        std::cout << "NewNode's cost : " << tree.getCost(new_node->id)[k] << std::endl;
-                        std::cout << "Ck_new : " << ck_new << std::endl;
+                        double ck_new = tree.getCost(NrNode->id)[k] + calculateSegmentCost(NrNode->state,new_node->state)[k];  // Line 7
+                        //std::cout << "NewNode's cost : " << tree.getCost(new_node->id)[k] << std::endl;
+                        //std::cout << "Ck_new : " << ck_new << std::endl;
                         if (ck_new < tree.cost_map[new_node->id][k]){ // Line 8
                             x_min = NrNode->state;  // Line 9
                             id_min = NrNode->id; // Line 9
@@ -481,7 +509,7 @@ void MORRFplanner::run(int max_iterations){
                             }
                             tree.cost_map[new_node->id][k] = ck_new;
 
-                            std::cout << "NewNode ID "<< new_node->id << " updated parent to " << id_min << " with cost " << tree.cost_map[new_node->id][k] << std::endl;
+                            //std::cout << "NewNode ID "<< new_node->id << " updated parent to " << id_min << " with cost " << tree.cost_map[new_node->id][k] << std::endl;
                         }
                     }
 
@@ -495,10 +523,26 @@ void MORRFplanner::run(int max_iterations){
                         + calculateSegmentCost(new_node->state,NrNode->state)[k];
                         if (ck_new_2 < tree.getCost(NrNode->id)[k]){
                             if (!isAncestor(tree.parent_map,new_node->id, NrNode->id)){
+                                if (NrNode->id == 0) {
+                                continue;
+                                }
+                                //
+                                if (tree.parent_map.count(NrNode->id)) {
+                                    int old_parent_id = tree.parent_map.at(NrNode->id);
+                                    
+                        
+                                    if (tree.children_map.count(old_parent_id)) {
+                                        auto& old_children_list = tree.children_map.at(old_parent_id);
+                                        auto it = std::remove(old_children_list.begin(), old_children_list.end(), NrNode->id);
+                                        old_children_list.erase(it, old_children_list.end());
+                                    }
+                                }
+                                //
+
                                 tree.parent_map[NrNode->id] = new_node_id; // Line 15-17
                                 tree.children_map[new_node->id].push_back(NrNode->id); // For cost propagation.
                                 tree.cost_map[NrNode->id][k] = ck_new_2; // Line 15-17
-                                propagateCostToChildren(tree, NrNode->id); // Propagate cost changes
+                                propagateCostToChildren(tree, NrNode->id,G_nodes); // Propagate cost changes
 
                                 }
                             }
@@ -508,80 +552,87 @@ void MORRFplanner::run(int max_iterations){
             }
 
 
-            double min_cost_0 = std::numeric_limits<double>::infinity();
-            for (auto const& [node_id, cost_vector] : reference_trees[0].cost_map) {
-                if (stateDistance(G_nodes[node_id]->state, goal) < threshold) {
-                    if (cost_vector[0] < min_cost_0) {
-                        min_cost_0 = cost_vector[0];
-                        z_utop[0] = min_cost_0; 
-                    }
-                }
-            }
-            double min_cost_1 = std::numeric_limits<double>::infinity();
-            for (auto const& [node_id, cost_vector] : reference_trees[1].cost_map) {
-                if (stateDistance(G_nodes[node_id]->state, goal) < threshold) {
-                    if (cost_vector[1] < min_cost_1) {
-                        min_cost_1 = cost_vector[1];
-                        z_utop[1] = min_cost_1;
-                    }
-                }
-            }
+            // double min_cost_0 = std::numeric_limits<double>::infinity();
+            // for (auto const& [node_id, cost_vector] : reference_trees[0].cost_map) {
+            //     if (stateDistance(G_nodes[node_id]->state, goal) < threshold) {
+            //         if (cost_vector[0] + calculateSegmentCost(G_nodes[node_id]->state, goal)[0] < min_cost_0) {
+            //             min_cost_0 = cost_vector[0] + calculateSegmentCost(G_nodes[node_id]->state, goal)[0];
+            //             z_utop[0] = min_cost_0; 
+            //             //std::cout << "Node ID : " << node_id << " with cost_vector[0] : " << cost_vector[0] << std::endl;
+            //         }
+
+            //     }
+            // }
+            // double min_cost_1 = std::numeric_limits<double>::infinity();
+            // for (auto const& [node_id, cost_vector] : reference_trees[1].cost_map) {
+            //     if (stateDistance(G_nodes[node_id]->state, goal) < threshold) {
+            //         if (cost_vector[1] + calculateSegmentCost(G_nodes[node_id]->state, goal)[1] < min_cost_1) {
+            //             min_cost_1 = cost_vector[1] + calculateSegmentCost(G_nodes[node_id]->state, goal)[1];
+            //             z_utop[1] = min_cost_1;
+            //         }
+            //     }
+            // }
+            //z_utop = {0.,0.};
             // Update the utopian point
-            if( i > 0 && i % 200 == 0){
-                std::cout << "Iter " << i << " | z_utop : " << z_utop[0] << ", " << z_utop[1] << std::endl;
+            if( i > 0 && i % 99 == 0){
+                std::cout << "Iter : " << i << " Search Radius : " << search_radius << " | z_utop : " << z_utop[0] << ", " << z_utop[1] << std::endl;
             }
-            std::cout << "-------- SubProblem Trees ... -----------" << std::endl;
-            std::cout << "Size of G_nodes : " << G_nodes.size() << std::endl;
+            //std::cout << "-------- SubProblem Trees ... -----------" << std::endl;
+            //std::cout << "Size of G_nodes : " << G_nodes.size() << std::endl;
             
             // SUBPROBLEM TREES EXTEND -- Oct 5rd. 2025
+
             for (size_t k = 0; k < num_sub; ++k){
-                std::cout << "-------Subproblem tree " << k << " ------------" << std::endl;
+                //std::cout << "-------Subproblem tree " << k << " ------------" << std::endl;
                 if (new_node->id == NstNode->id) continue; // Line 1
                 Tree& tree = subproblem_trees[k];
 
                 int id_min = NstNode->id; // Line 3
                 State x_min = NstNode->state; // Line 3
-                tree.parent_map[new_node->id] = NstNode->id;
-                tree.children_map[NstNode->id].push_back(new_node->id);
-                std::vector<std::shared_ptr<Node>> NrNodes = getNearNodes(x_min, radius); // Line 4
-                tree.cost_map[NstNode->id] = tree.getCost(NstNode->id); // Line 3
-                std::cout << "Nst Node "<< NstNode->id <<  " State: " << NstNode->state.x << ", " << NstNode->state.y << std::endl;
-                std::cout << "Cost map of " << NstNode->id << " : " << tree.cost_map[NstNode->id][0] << ", " << tree.cost_map[NstNode->id][1] << std::endl;
-                tree.cost_map[new_node->id] = tree.cost_map[NstNode->id] + calculateSegmentCost(NstNode->state,new_node->state); // Line 3
-                std::cout << "New Node "<<new_node->id <<  " State: " << new_node->state.x << ", " << new_node->state.y << std::endl;
-                std::cout << "Cost map of " << new_node->id << " : " << tree.cost_map[new_node->id][0] << ", " << tree.cost_map[new_node->id][1] << std::endl;
                 
-                //std::cout << "NrNodes size: " << NrNodes.size() << std::endl;
-                //std::cout << "subproblem tree's size: " << tree.cost_map.size() << std::endl;
+                tree.parent_map[new_node->id] = NstNode->id;
+                std::cout << "New Node ID : " << new_node->id << "  NstNode ID : " << NstNode->id << std::endl;
+                std::vector<std::shared_ptr<Node>> NrNodes = getNearNodes(new_node->state, search_radius); // Line 4
+
+                //tree.cost_map[NstNode->id] = tree.getCost(NstNode->id); // Line 3
+                tree.cost_map[new_node->id] = tree.cost_map[NstNode->id] + calculateSegmentCost(NstNode->state,new_node->state); // Line 3
+            
                 // Checking the new node can find a better parent among near nodes.
+                std::vector<double> min_cost_vec = tree.getCost(new_node->id); 
+                if (min_cost_vec != tree.cost_map[new_node->id]){
+                    std::cout << "Mismatch in cost map for New Node ID " << new_node->id << std::endl;
+                }
+                // NOT using all path.
+                //zhat_utop = z_utop(v);
+                double eta_min = calculateTchebycheffFitness(min_cost_vec, lambdas[k], z_utop);
+                std::cout << "eta minim : " << eta_min << std::endl;
                 for (std::shared_ptr<Node> NrNode:NrNodes){
                     if (isObstacleFree(line(new_node->state,NrNode->state))){
-                        std::vector<double> cost_vec = tree.getCost(NrNode->id)
+                        std::vector<double> cost_vec = tree.getCost(NrNode->id) 
                         + calculateSegmentCost(NrNode->state,new_node->state); // Line 7
-                        std::cout << "COST_VEC OF NEW NODE through NrNode : " << cost_vec[0] << ", " << cost_vec[1] << std::endl;
                         double eta_current = calculateTchebycheffFitness(cost_vec, lambdas[k], z_utop); // Line 8
-                        std::cout << "ETA CURRENT : " << eta_current << std::endl;
-                        std::vector<double> new_cost = tree.getCost(new_node->id); // Line 9
-                        std::cout << "COST VECTOR OF NEW NODE : " << new_cost[0] << ", " << new_cost[1] << std::endl;
-                        double eta_new = calculateTchebycheffFitness(new_cost, lambdas[k], z_utop); // Line 10
-                        std::cout << "ETA NEW : " << eta_new << std::endl;
-                        if (eta_current < eta_new){
+                        std::cout << "Nr Node ID: " << NrNode->id << " Cost Vec: " << cost_vec[0] << ", " << cost_vec[1] << "eta CURRENT " << eta_current << std::endl;
+                        
+                        if (eta_current < eta_min){
                             x_min = NrNode->state;
                             id_min = NrNode->id;
-
+                            eta_min = eta_current;
+                            min_cost_vec = cost_vec;
                             tree.parent_map[new_node_id] = id_min; // Line 13
-                            tree.cost_map[new_node->id] = cost_vec; // Line 13
-                            std::cout << "NrNode ID: " << NrNode->id << std::endl;
-                            std::cout << "cost_Vec " << cost_vec[0] << ", " << cost_vec[1] << std::endl;
-                            std::cout << "z_utop " << z_utop[0] << ", " << z_utop[1] << std::endl;
-                            std::cout << "eta_current " << eta_current << " eta_new " << eta_new << std::endl;
+                            tree.cost_map[new_node->id] = min_cost_vec; // Line 13
+                            //std::cout << "NrNode ID: " << NrNode->id << std::endl;
+                            //std::cout << "cost_Vec " << cost_vec[0] << ", " << cost_vec[1] << std::endl;
+                            //std::cout << "z_utop " << z_utop[0] << ", " << z_utop[1] << std::endl;
+                            //std::cout << "eta_current " << eta_current << " eta_min " << eta_min << std::endl;
                         }
                     }
                 }
+                tree.children_map[id_min].push_back(new_node->id); // For cost propagation, remember the children node.
+                
                 //tree.parent_map[new_node_id] = id_min; // Line 13
                 //tree.cost_map[new_node->id] = tree.getCost(id_min) + calculateSegmentCost(x_min,new_node->state); // Line 3
-                std::cout << "After New Node "<<new_node->id <<  " State: " << new_node->state.x << ", " << new_node->state.y << std::endl;
-                std::cout << "After Cost map of " << new_node->id << " : " << tree.cost_map[new_node->id][0] << ", " << tree.cost_map[new_node->id][1] << std::endl;
+                //std::cout << "After New Node "<<new_node->id <<  " State: " << new_node->state.x << ", " << new_node->state.y << std::endl;
+                //std::cout << "After Cost map of " << new_node->id << " : " << tree.cost_map[new_node->id][0] << ", " << tree.cost_map[new_node->id][1] << std::endl;
                 
                 // Rewiring step : checking the new node can be a parent of near nodes.
                 // Propagation of cost change by switiching the parent.
@@ -589,15 +640,33 @@ void MORRFplanner::run(int max_iterations){
                 for (std::shared_ptr<Node> NrNode:NrNodes){
                     if (NrNode->id == id_min) continue; // Line 11
                     if (isObstacleFree(line(new_node->state,NrNode->state))){
-                        std::vector<double> cost_vec_2 = tree.getCost(new_node->id)
+                        std::vector<double> cost_vec_2 = tree.getCost(new_node->id) 
                         + calculateSegmentCost(new_node->state,NrNode->state);
                         double eta_current_2 = calculateTchebycheffFitness(cost_vec_2, lambdas[k], z_utop);
                         std::vector<double> near_cost = tree.getCost(NrNode->id);
                         double eta_near = calculateTchebycheffFitness(near_cost, lambdas[k], z_utop);
                         if (eta_current_2 < eta_near){
+                            // Rewiring happens
+                            if (NrNode->id == 0) {
+                                continue;
+                            }
                             if (!isAncestor(tree.parent_map, new_node->id, NrNode->id)){
+                                //
+                                if (tree.parent_map.count(NrNode->id)) {
+                                    int old_parent_id = tree.parent_map.at(NrNode->id);
+                                    
+                                    if (tree.children_map.count(old_parent_id)) {
+                                        auto& old_children_list = tree.children_map.at(old_parent_id);
+                                        auto it = std::remove(old_children_list.begin(), old_children_list.end(), NrNode->id);
+                                        old_children_list.erase(it, old_children_list.end());
+                                    }
+                                }
+                                //
+                                //std::cout << "Rewiring: NrNode ID " << NrNode->id << " changes parent to NewNode ID " << new_node->id << std::endl;
                                 tree.parent_map[NrNode->id] = new_node->id; // Line 21-23
                                 tree.cost_map[NrNode->id] = cost_vec_2; // Line 21-23
+                                tree.children_map[new_node->id].push_back(NrNode->id);
+                                propagateCostToChildren(tree, NrNode->id,G_nodes); // Propagate cost changes
                            }
                         }
                     }
@@ -605,7 +674,6 @@ void MORRFplanner::run(int max_iterations){
             }
         }
     }
-}
 double calculateTchebycheffFitness(const std::vector<double>& cost_vec, const std::vector<double>& lambda, const std::vector<double>& z_utop) {
     double max_val = -1.0;
     // Improve the worst element.
@@ -619,27 +687,39 @@ double calculateTchebycheffFitness(const std::vector<double>& cost_vec, const st
 std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to){
     std::vector<double> cost(2.0,0.0);
     cost[0] = stateDistance(s_from,s_to);
+        // Returns the distance from the given state's position to the
+    /*
+    // boundary of the circular obstacle.
+    double clearance(const ob::State *state) const override
+    {
+        // We know we're working with a RealVectorStateSpace in this
+        // example, so we downcast state into the specific type.
+        const auto *state2D = state->as<ob::RealVectorStateSpace::StateType>();
 
-    // double sx = (s_from.x + s_to.x) / 2;
-    // double sy = (s_from.y + s_to.y) / 2;
-    // const double obstacle_cx = 10.0;
-    // const double obstacle_cy = 5.0;
-    // const double radius = 5.0;
-    // const double max_risk = 10000;
+        // Extract the robot's (x,y) position from its state
+        double x = state2D->values[0];
+        double y = state2D->values[1];
 
-    // double dx = sx - obstacle_cx;
-    // double dy = sy - obstacle_cy;
+        // Distance formula between two points, offset by the circle's
+        // radius
+        return sqrt((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5)) - 0.25;
+    */
+    
+    double sx = (s_from.x + s_to.x) / 2;
+    double sy = (s_from.y + s_to.y) / 2;
+    const double obstacle_cx = 10.0;
+    const double obstacle_cy = 10.0;
+    const double radius = 5.0;
+    const double max_risk = 10000;
 
-    // double distance = std::sqrt(dx * dx + dy * dy);
+    double dx = sx - obstacle_cx;
+    double dy = sy - obstacle_cy;
 
-    // if (distance <= radius) {
-    //     //cost[1] =  std::numeric_limits<double>::infinity();
-    //     cost[1] = max_risk;
-    // } else {
-    //     //cost[1] = 1.0 / distance;
-    //     cost[1] = distance;
-    // }
-    cost[1] = cost[0];
+    double distance = std::sqrt(dx * dx + dy * dy) - radius;
+    cost[1] = distance;
+    
+    //cost[1] = cost[0];
+    
     return cost;
 }
 
@@ -648,9 +728,9 @@ int main(){
     State start = {0.0, 1.0};
     State goal = {20.0,15.0}; 
     int num_objectives = 2;
-    int num_subproblems = 3;
+    int num_subproblems = 11;
     double threshold = 0.5;
-    int iterations = 5000;
+    int iterations = 2500;
     MORRFplanner planner(start, goal, threshold, num_objectives, num_subproblems);
     // 3. running the planner
     std::cout << "Starting MORRF* planning with point mass..." << std::endl;
@@ -662,8 +742,9 @@ int main(){
     std::cout << "Planning finished." << std::endl;
     //planner.saveCostsToCSV("pareto_costs.csv");
     std::cout << "Saving tree structures to .txt files..." << std::endl;
-    planner.saveTreesToTxt("final_trees_data");
+    planner.saveParentMapToTxt("final_trees_data");
     planner.saveCostsToCSV("results.csv");
+    planner.saveChildrenMapToTxt("parent_data");
     std::cout << "Saving paths results to CSV ..." << std::endl;
     return 0;
 
