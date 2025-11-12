@@ -1,0 +1,30 @@
+Start testing: Nov 10 13:13 MST
+----------------------------------------------------------
+1/1 Testing: test_basic_example
+1/1 Test: test_basic_example
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/basic_example/build/bin/basic_example"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/basic_example/build
+"test_basic_example" start time: Nov 10 13:13 MST
+Output:
+----------------------------------------------------------
+I1110 13:15:01.875376 39637615 basic_example.cc:30] Google OR-Tools version : 9.10.4067
+I1110 13:15:01.875964 39637615 basic_example.cc:46] Number of variables = 2
+I1110 13:15:01.875993 39637615 basic_example.cc:56] Number of constraints = 1
+I1110 13:15:01.875995 39637615 basic_example.cc:68] Solving with Glop solver v9.10.4067
+I1110 13:15:01.876130 39637615 basic_example.cc:74] Status: MPSOLVER_OPTIMAL
+I1110 13:15:01.876145 39637615 basic_example.cc:85] Solution:
+I1110 13:15:01.876145 39637615 basic_example.cc:86] Objective value = 4
+I1110 13:15:01.876149 39637615 basic_example.cc:87] x = 1
+I1110 13:15:01.876150 39637615 basic_example.cc:88] y = 1
+I1110 13:15:01.876151 39637615 basic_example.cc:92] Advanced usage:
+I1110 13:15:01.876152 39637615 basic_example.cc:93] Problem solved in 0 milliseconds
+I1110 13:15:01.876153 39637615 basic_example.cc:94] Problem solved in 0 iterations
+<end of output>
+Test time =  69.58 sec
+----------------------------------------------------------
+Test Passed.
+"test_basic_example" end time: Nov 10 13:15 MST
+"test_basic_example" time elapsed: 00:01:09
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

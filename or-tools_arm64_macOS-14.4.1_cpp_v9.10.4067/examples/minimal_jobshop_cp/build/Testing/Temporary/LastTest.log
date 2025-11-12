@@ -1,0 +1,46 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_minimal_jobshop_cp
+1/1 Test: test_minimal_jobshop_cp
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/minimal_jobshop_cp/build/bin/minimal_jobshop_cp"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/minimal_jobshop_cp/build
+"test_minimal_jobshop_cp" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+I1110 13:15:31.609450 39644236 minimal_jobshop_cp.cc:41] Machines:  0 1 2
+I1110 13:15:31.609463 39644236 minimal_jobshop_cp.cc:51] Jobs:
+I1110 13:15:31.609465 39644236 minimal_jobshop_cp.cc:59] Job 0: [(0, 3)(1, 2)(2, 2)]
+
+I1110 13:15:31.609467 39644236 minimal_jobshop_cp.cc:59] Job 1: [(0, 2)(2, 1)(1, 4)]
+
+I1110 13:15:31.609468 39644236 minimal_jobshop_cp.cc:59] Job 2: [(1, 4)(2, 3)]
+
+I1110 13:15:31.609469 39644236 minimal_jobshop_cp.cc:69] Horizon: 21
+I1110 13:15:31.609598 39644236 search.cc:285] Start search (memory used = 9.78 MB)
+I1110 13:15:31.609645 39644236 search.cc:285] Root node processed (time = 0 ms, constraints = 39, memory used = 10.00 MB)
+I1110 13:15:31.609699 39644236 search.cc:285] Solution #0 (objective = 14, time = 0 ms, branches = 6, failures = 0, depth = 6, memory used = 10.05 MB)
+I1110 13:15:31.609736 39644236 search.cc:285] Solution #1 (objective = 12, objective maximum = 14, time = 0 ms, branches = 8, failures = 4, depth = 4, memory used = 10.06 MB)
+I1110 13:15:31.609762 39644236 search.cc:285] Solution #2 (objective = 11, objective maximum = 14, time = 0 ms, branches = 10, failures = 6, depth = 3, memory used = 10.06 MB)
+I1110 13:15:31.609777 39644236 search.cc:285] Finished search tree (time = 0 ms, branches = 10, failures = 9, memory used = 10.06 MB)
+I1110 13:15:31.609784 39644236 search.cc:285] End search (time = 1 ms, branches = 10, failures = 9, memory used = 10.06 MB, speed = 10000 branches/s)
+I1110 13:15:31.609785 39644236 minimal_jobshop_cp.cc:159] Optimal Schedule Length: 11
+I1110 13:15:31.609787 39644236 minimal_jobshop_cp.cc:160] 
+I1110 13:15:31.609788 39644236 minimal_jobshop_cp.cc:162] Optimal Schedule:
+I1110 13:15:31.609789 39644236 minimal_jobshop_cp.cc:171] Machine 0: Job_0_0 Job_1_0 
+I1110 13:15:31.609793 39644236 minimal_jobshop_cp.cc:171] Machine 1: Job_2_0 Job_0_1 Job_1_2 
+I1110 13:15:31.609797 39644236 minimal_jobshop_cp.cc:171] Machine 2: Job_1_1 Job_0_2 Job_2_1 
+I1110 13:15:31.609799 39644236 minimal_jobshop_cp.cc:189] Time Intervals for Tasks: 
+I1110 13:15:31.609800 39644236 minimal_jobshop_cp.cc:191] Machine 0: [( 0, 0),( 3, 3)][( 3, 3),( 5, 5)]
+I1110 13:15:31.609801 39644236 minimal_jobshop_cp.cc:191] Machine 1: [( 0, 0),( 4, 4)][( 4, 4),( 6, 6)][( 6, 7),(10, 11)]
+I1110 13:15:31.609801 39644236 minimal_jobshop_cp.cc:191] Machine 2: [( 5, 5),( 6, 6)][( 6, 6),( 8, 8)][( 8, 8),(11, 11)]
+I1110 13:15:31.609803 39644236 minimal_jobshop_cp.cc:193] Advanced usage:
+I1110 13:15:31.609803 39644236 minimal_jobshop_cp.cc:194] Time: 0ms
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"test_minimal_jobshop_cp" end time: Nov 10 13:15 MST
+"test_minimal_jobshop_cp" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

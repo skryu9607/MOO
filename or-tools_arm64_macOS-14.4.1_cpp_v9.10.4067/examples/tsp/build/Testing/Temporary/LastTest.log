@@ -1,0 +1,18 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_tsp
+1/1 Test: test_tsp
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/tsp/build/bin/tsp"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/tsp/build
+"test_tsp" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.18 sec
+----------------------------------------------------------
+Test Passed.
+"test_tsp" end time: Nov 10 13:15 MST
+"test_tsp" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

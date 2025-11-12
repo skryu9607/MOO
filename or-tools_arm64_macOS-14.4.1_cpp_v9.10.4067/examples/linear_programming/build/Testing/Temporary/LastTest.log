@@ -1,0 +1,78 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_linear_programming
+1/1 Test: test_linear_programming
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/linear_programming/build/bin/linear_programming"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/linear_programming/build
+"test_linear_programming" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+I1110 13:15:04.450154 39640523 linear_programming.cc:31] ---- Linear programming example with GLOP ----
+I1110 13:15:04.450626 39640523 linear_programming.cc:78] Number of variables = 3
+I1110 13:15:04.450632 39640523 linear_programming.cc:79] Number of constraints = 3
+I1110 13:15:04.450868 39640523 linear_programming.cc:88] Problem solved in 0 milliseconds
+I1110 13:15:04.450872 39640523 linear_programming.cc:91] Optimal objective value = 733.333
+I1110 13:15:04.450876 39640523 linear_programming.cc:94] x1 = 33.3333
+I1110 13:15:04.450877 39640523 linear_programming.cc:95] x2 = 66.6667
+I1110 13:15:04.450878 39640523 linear_programming.cc:96] x3 = 0
+I1110 13:15:04.450879 39640523 linear_programming.cc:98] Advanced usage:
+I1110 13:15:04.450879 39640523 linear_programming.cc:99] Problem solved in 2 iterations
+I1110 13:15:04.450881 39640523 linear_programming.cc:100] x1: reduced cost = 0
+I1110 13:15:04.450882 39640523 linear_programming.cc:101] x2: reduced cost = 0
+I1110 13:15:04.450882 39640523 linear_programming.cc:102] x3: reduced cost = -2.66667
+I1110 13:15:04.450884 39640523 linear_programming.cc:104] c0: dual value = 3.33333 activity = 100
+I1110 13:15:04.450885 39640523 linear_programming.cc:106] c1: dual value = 0.666667 activity = 600
+I1110 13:15:04.450886 39640523 linear_programming.cc:108] c2: dual value = -0 activity = 200
+I1110 13:15:04.450898 39640523 linear_programming.cc:31] ---- Linear programming example with CLP ----
+I1110 13:15:04.450970 39640523 linear_programming.cc:78] Number of variables = 3
+I1110 13:15:04.450972 39640523 linear_programming.cc:79] Number of constraints = 3
+I1110 13:15:04.451175 39640523 linear_programming.cc:88] Problem solved in 0 milliseconds
+I1110 13:15:04.451177 39640523 linear_programming.cc:91] Optimal objective value = 733.333
+I1110 13:15:04.451179 39640523 linear_programming.cc:94] x1 = 33.3333
+I1110 13:15:04.451180 39640523 linear_programming.cc:95] x2 = 66.6667
+I1110 13:15:04.451180 39640523 linear_programming.cc:96] x3 = 0
+I1110 13:15:04.451181 39640523 linear_programming.cc:98] Advanced usage:
+I1110 13:15:04.451182 39640523 linear_programming.cc:99] Problem solved in 2 iterations
+I1110 13:15:04.451183 39640523 linear_programming.cc:100] x1: reduced cost = -6.66134e-16
+I1110 13:15:04.451184 39640523 linear_programming.cc:101] x2: reduced cost = 0
+I1110 13:15:04.451185 39640523 linear_programming.cc:102] x3: reduced cost = -2.66667
+I1110 13:15:04.451186 39640523 linear_programming.cc:104] c0: dual value = 3.33333 activity = 100
+I1110 13:15:04.451187 39640523 linear_programming.cc:106] c1: dual value = 0.666667 activity = 600
+I1110 13:15:04.451188 39640523 linear_programming.cc:108] c2: dual value = -0 activity = 200
+I1110 13:15:04.451213 39640523 linear_programming.cc:31] ---- Linear programming example with GUROBI_LP ----
+W1110 13:15:04.452639 39640523 environment.cc:36] NOT_FOUND: Could not find the Gurobi shared library. Looked in: [/Library/gurobi1101/mac64/lib/libgurobi110.dylib', '/Library/gurobi1101/macos_universal2/lib/libgurobi110.dylib', '/Library/gurobi1100/mac64/lib/libgurobi110.dylib', '/Library/gurobi1100/macos_universal2/lib/libgurobi110.dylib', '/Library/gurobi1003/mac64/lib/libgurobi100.dylib', '/Library/gurobi1003/macos_universal2/lib/libgurobi100.dylib', '/Library/gurobi1002/mac64/lib/libgurobi100.dylib', '/Library/gurobi1002/macos_universal2/lib/libgurobi100.dylib', '/Library/gurobi1001/mac64/lib/libgurobi100.dylib', '/Library/gurobi1001/macos_universal2/lib/libgurobi100.dylib', '/Library/gurobi1000/mac64/lib/libgurobi100.dylib', '/Library/gurobi1000/macos_universal2/lib/libgurobi100.dylib', '/Library/gurobi952/mac64/lib/libgurobi95.dylib', '/Library/gurobi952/macos_universal2/lib/libgurobi95.dylib', '/Library/gurobi951/mac64/lib/libgurobi95.dylib', '/Library/gurobi951/macos_universal2/lib/libgurobi95.dylib', '/Library/gurobi950/mac64/lib/libgurobi95.dylib', '/Library/gurobi950/macos_universal2/lib/libgurobi95.dylib', '/Library/gurobi911/mac64/lib/libgurobi91.dylib', '/Library/gurobi911/macos_universal2/lib/libgurobi91.dylib', '/Library/gurobi910/mac64/lib/libgurobi91.dylib', '/Library/gurobi910/macos_universal2/lib/libgurobi91.dylib', '/Library/gurobi903/mac64/lib/libgurobi90.dylib', '/Library/gurobi903/macos_universal2/lib/libgurobi90.dylib', '/Library/gurobi902/mac64/lib/libgurobi90.dylib', '/Library/gurobi902/macos_universal2/lib/libgurobi90.dylib', '/Library/gurobi811/mac64/lib/libgurobi81.dylib', '/Library/gurobi811/macos_universal2/lib/libgurobi81.dylib', '/Library/gurobi801/mac64/lib/libgurobi80.dylib', '/Library/gurobi801/macos_universal2/lib/libgurobi80.dylib', '/Library/gurobi752/mac64/lib/libgurobi75.dylib', '/Library/gurobi752/macos_universal2/lib/libgurobi75.dylib', '/opt/gurobi/linux64/lib/libgurobi.so.11.0.0', '/opt/gurobi/linux64/lib/libgurobi.so.10.0.3', '/opt/gurobi/linux64/lib/libgurobi.so.10.0.2', '/opt/gurobi/linux64/lib/libgurobi.so.10.0.1', '/opt/gurobi/linux64/lib/libgurobi.so.10.0.0', '/opt/gurobi/linux64/lib/libgurobi.so.9.5.2', '/opt/gurobi/linux64/lib/libgurobi.so.9.5.1', '/opt/gurobi/linux64/lib/libgurobi.so.9.5.0]. If you know where it is, pass the full path to 'LoadGurobiDynamicLibrary()'.
+I1110 13:15:04.452643 39640523 linear_programming.cc:39] Supports for solver GUROBI_LP not linked in.
+I1110 13:15:04.452644 39640523 linear_programming.cc:31] ---- Linear programming example with CPLEX_LP ----
+I1110 13:15:04.452645 39640523 linear_programming.cc:39] Supports for solver CPLEX_LP not linked in.
+I1110 13:15:04.452646 39640523 linear_programming.cc:31] ---- Linear programming example with GLPK_LP ----
+I1110 13:15:04.452647 39640523 linear_programming.cc:39] Supports for solver GLPK_LP not linked in.
+I1110 13:15:04.452647 39640523 linear_programming.cc:31] ---- Linear programming example with XPRESS_LP ----
+W1110 13:15:04.452654 39640523 environment.cc:201] Environment variable XPRESSDIR undefined.
+W1110 13:15:04.452691 39640523 environment.cc:267] NOT_FOUND: Could not find the Xpress shared library. Looked in: [/Library/xpressmp/lib/libxprs.dylib]. Please check environment variable XPRESSDIR
+
+I1110 13:15:04.452694 39640523 linear_programming.cc:39] Supports for solver XPRESS_LP not linked in.
+I1110 13:15:04.452694 39640523 linear_programming.cc:31] ---- Linear programming example with PDLP ----
+I1110 13:15:04.452700 39640523 linear_programming.cc:78] Number of variables = 3
+I1110 13:15:04.452701 39640523 linear_programming.cc:79] Number of constraints = 3
+I1110 13:15:04.453112 39640523 linear_programming.cc:88] Problem solved in 0 milliseconds
+I1110 13:15:04.453115 39640523 linear_programming.cc:91] Optimal objective value = 733.334
+I1110 13:15:04.453116 39640523 linear_programming.cc:94] x1 = 33.3325
+I1110 13:15:04.453117 39640523 linear_programming.cc:95] x2 = 66.6682
+I1110 13:15:04.453118 39640523 linear_programming.cc:96] x3 = 0
+I1110 13:15:04.453119 39640523 linear_programming.cc:98] Advanced usage:
+I1110 13:15:04.453119 39640523 linear_programming.cc:99] Problem solved in 256 iterations
+I1110 13:15:04.453120 39640523 linear_programming.cc:100] x1: reduced cost = 1.32704e-06
+I1110 13:15:04.453121 39640523 linear_programming.cc:101] x2: reduced cost = -6.2921e-07
+I1110 13:15:04.453122 39640523 linear_programming.cc:102] x3: reduced cost = -2.66667
+I1110 13:15:04.453123 39640523 linear_programming.cc:104] c0: dual value = 3.33334 activity = 100.001
+I1110 13:15:04.453125 39640523 linear_programming.cc:106] c1: dual value = 0.666666 activity = 599.997
+I1110 13:15:04.453126 39640523 linear_programming.cc:108] c2: dual value = -0 activity = 200.001
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"test_linear_programming" end time: Nov 10 13:15 MST
+"test_linear_programming" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

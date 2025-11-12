@@ -13,5 +13,5 @@ using Vector = std::vector<double>;
 class IPlanner {
     public: 
     virtual ~IPlanner() = default;
-    virtual Vector solve(const Vector% weight) = 0;
-}
+    virtual Vector solve(const Vector& weight) = 0;
+};

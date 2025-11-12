@@ -1,0 +1,23 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_simple_knapsack_program
+1/1 Test: test_simple_knapsack_program
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_knapsack_program/build/bin/simple_knapsack_program"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_knapsack_program/build
+"test_simple_knapsack_program" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1762805707.818788 39641055 simple_knapsack_program.cc:71] Total value: 847
+I0000 00:00:1762805707.818835 39641055 simple_knapsack_program.cc:72] Packed items: {2, 3, 6, 13}
+I0000 00:00:1762805707.818836 39641055 simple_knapsack_program.cc:73] Total weight: 847
+I0000 00:00:1762805707.818837 39641055 simple_knapsack_program.cc:74] Packed weights: {194, 130, 230, 293}
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"test_simple_knapsack_program" end time: Nov 10 13:15 MST
+"test_simple_knapsack_program" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

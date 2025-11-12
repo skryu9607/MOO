@@ -14,13 +14,14 @@ struct Solution{
     std::vector<double> objectives;
     double cost;
 
-    Solution(const std::vector<double>& w, const std::vector<double>& obj, double c)
-        : weight(w), objectives(obj), cost(c) {}
+    Solution(const std::vector<double>& w, const std::vector<double>& obj)
+        : weight(w), objectives(obj) {
         cost = 0.0;
         for (size_t i = 0; i < objectives.size(); ++i) {
             cost += weight[i] * objectives[i];
         }
-}
+    }
+};
 
 using Solutions = std::vector<Solution>;
 

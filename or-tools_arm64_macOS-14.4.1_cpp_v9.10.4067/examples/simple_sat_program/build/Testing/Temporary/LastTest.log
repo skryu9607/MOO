@@ -1,0 +1,22 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_simple_sat_program
+1/1 Test: test_simple_sat_program
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_sat_program/build/bin/simple_sat_program"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_sat_program/build
+"test_simple_sat_program" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1762805716.226704 39642488 simple_sat_program.cc:53] x = 1
+I0000 00:00:1762805716.226719 39642488 simple_sat_program.cc:54] y = 0
+I0000 00:00:1762805716.226721 39642488 simple_sat_program.cc:55] z = 0
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"test_simple_sat_program" end time: Nov 10 13:15 MST
+"test_simple_sat_program" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

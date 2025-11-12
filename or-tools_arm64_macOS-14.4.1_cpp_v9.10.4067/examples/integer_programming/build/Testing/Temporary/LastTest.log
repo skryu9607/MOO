@@ -1,0 +1,45 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_integer_programming
+1/1 Test: test_integer_programming
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/integer_programming/build/bin/integer_programming"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/integer_programming/build
+"test_integer_programming" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+I1110 13:15:06.174893 39640772 integer_programming.cc:27] ---- Integer programming example with CBC ----
+I1110 13:15:06.175401 39640772 integer_programming.cc:63] Number of variables = 2
+I1110 13:15:06.175406 39640772 integer_programming.cc:64] Number of constraints = 2
+I1110 13:15:06.176412 39640772 integer_programming.cc:71] Solution:
+I1110 13:15:06.176416 39640772 integer_programming.cc:72] x = 3
+I1110 13:15:06.176418 39640772 integer_programming.cc:73] y = 2
+I1110 13:15:06.176419 39640772 integer_programming.cc:74] Optimal objective value = 23
+I1110 13:15:06.176420 39640772 integer_programming.cc:75] 
+I1110 13:15:06.176421 39640772 integer_programming.cc:76] Advanced usage:
+I1110 13:15:06.176421 39640772 integer_programming.cc:77] Problem solved in 1 milliseconds
+I1110 13:15:06.176423 39640772 integer_programming.cc:78] Problem solved in 1 iterations
+I1110 13:15:06.176424 39640772 integer_programming.cc:79] Problem solved in 0 branch-and-bound nodes
+I1110 13:15:06.176453 39640772 integer_programming.cc:27] ---- Integer programming example with SAT ----
+I1110 13:15:06.176459 39640772 integer_programming.cc:63] Number of variables = 2
+I1110 13:15:06.176461 39640772 integer_programming.cc:64] Number of constraints = 2
+I1110 13:15:06.179041 39640772 integer_programming.cc:71] Solution:
+I1110 13:15:06.179050 39640772 integer_programming.cc:72] x = 3
+I1110 13:15:06.179054 39640772 integer_programming.cc:73] y = 2
+I1110 13:15:06.179055 39640772 integer_programming.cc:74] Optimal objective value = 23
+I1110 13:15:06.179057 39640772 integer_programming.cc:75] 
+I1110 13:15:06.179057 39640772 integer_programming.cc:76] Advanced usage:
+I1110 13:15:06.179058 39640772 integer_programming.cc:77] Problem solved in 2 milliseconds
+I1110 13:15:06.179060 39640772 integer_programming.cc:78] Problem solved in 0 iterations
+I1110 13:15:06.179061 39640772 integer_programming.cc:79] Problem solved in 0 branch-and-bound nodes
+I1110 13:15:06.179063 39640772 integer_programming.cc:27] ---- Integer programming example with SCIP ----
+I1110 13:15:06.180267 39640772 integer_programming.cc:63] Number of variables = 2
+I1110 13:15:06.180274 39640772 integer_programming.cc:64] Number of constraints = 2
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"test_integer_programming" end time: Nov 10 13:15 MST
+"test_integer_programming" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

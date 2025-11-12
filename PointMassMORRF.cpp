@@ -346,9 +346,7 @@ void MORRFplanner::saveParentMapToTxt(const std::string& prefix) const {
     }
 };
 void MORRFplanner::saveChildrenMapToTxt(const std::string& prefix) const {
-    // Subproblem Trees -> .txt file (Children Map 저장)
     for (size_t i = 0; i < subproblem_trees.size(); ++i) {
-        // 파일 이름이 겹치지 않도록 "children" 명시
         std::string filename = prefix + "_subproblem_children_" + std::to_string(i) + ".txt";
         std::ofstream file(filename);
         if (!file.is_open()) {
@@ -360,22 +358,15 @@ void MORRFplanner::saveChildrenMapToTxt(const std::string& prefix) const {
         file << "======================================" << std::endl;
         file << "Parent ID (x, y) -> [List of Children IDs (x, y)]" << std::endl;
         
-        // 해당 트리의 children_map을 가져옵니다.
         const auto& children_map = subproblem_trees[i].children_map;
 
-        // children_map을 순회합니다. (key: parent_id, value: vector<int> children_list)
+        // children_map. (key: parent_id, value: vector<int> children_list)
         for (const auto& [parent_id, children_list] : children_map) {
-            // G_nodes에서 부모 노드 정보 확인
             if (parent_id >= G_nodes.size()) continue; 
             const State& parent_state = G_nodes[parent_id]->state;
-
-            // 부모 노드 정보 출력
             file << "    " << parent_id 
                  << " (" << parent_state.x << ", " << parent_state.y << ") -> [ ";
-
-            // 자식 노드 리스트 순회
             for (int child_id : children_list) {
-                // G_nodes에서 자식 노드 정보 확인
                 if (child_id < G_nodes.size()) {
                     const State& child_state = G_nodes[child_id]->state;
                     file << child_id << " (" << child_state.x << ", " << child_state.y << "); ";
@@ -383,7 +374,7 @@ void MORRFplanner::saveChildrenMapToTxt(const std::string& prefix) const {
                     file << child_id << " (State N/A); ";
                 }
             }
-            file << "]" << std::endl; // 한 줄 마무리
+            file << "]" << std::endl; 
         }
         
         file.close();
@@ -415,21 +406,26 @@ Trajectory line(const State& s_from, const State& s_to){
     Trajectory traj;
     traj.path.push_back(s_from);
     double dist = std::hypot(s_to.x - s_from.x, s_to.y - s_from.y);
-    int num_steps = 11;
+    int num_steps = 21;
 
-    for (int i = 1; i < num_steps; ++i){
+    for (int i = 1; i <= num_steps; ++i){
         double ratio = i / num_steps;
         State intermediate;
         intermediate.x = s_from.x + ratio * (s_to.x - s_from.x);
         intermediate.y = s_from.y + ratio * (s_to.y - s_from.y);
-        traj.path.push_back(intermediate);
-    }
-    traj.path.push_back(s_to);
+        if (isObstacleFree(lineintermediate)){
+            traj.path.push_back(intermediate);
+        }
+    } 
+    //traj.path.push_back(s_to);
     return traj;
 }
-bool isObstacleFree(const Trajectory& traj){
-    
-    
+bool isObstacleFree(const Traj& traj){
+    double dist = stateDistance(s, State{10.0,10.0});
+    if (dist <= 2.5){
+        return false;
+    }
+
     return true;
 }
 void propagateCostToChildren(Tree& tree, int parent_id, const std::vector<std::shared_ptr<Node>>& G_nodes) {
@@ -709,7 +705,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
     double sy = (s_from.y + s_to.y) / 2;
     const double obstacle_cx = 10.0;
     const double obstacle_cy = 10.0;
-    const double radius = 5.0;
+    const double radius = 2.5;
     const double max_risk = 10000;
 
     double dx = sx - obstacle_cx;

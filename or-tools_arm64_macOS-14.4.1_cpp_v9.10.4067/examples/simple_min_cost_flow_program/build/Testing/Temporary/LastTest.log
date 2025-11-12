@@ -1,0 +1,31 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_simple_min_cost_flow_program
+1/1 Test: test_simple_min_cost_flow_program
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_min_cost_flow_program/build/bin/simple_min_cost_flow_program"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_min_cost_flow_program/build
+"test_simple_min_cost_flow_program" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1762805710.891641 39641568 simple_min_cost_flow_program.cc:65] Minimum cost flow: 150
+I0000 00:00:1762805710.891662 39641568 simple_min_cost_flow_program.cc:66] 
+I0000 00:00:1762805710.891663 39641568 simple_min_cost_flow_program.cc:67]  Arc   Flow / Capacity  Cost
+I0000 00:00:1762805710.891664 39641568 simple_min_cost_flow_program.cc:70] 0 -> 1  12  / 15       48
+I0000 00:00:1762805710.891666 39641568 simple_min_cost_flow_program.cc:70] 0 -> 2  8  / 8       32
+I0000 00:00:1762805710.891669 39641568 simple_min_cost_flow_program.cc:70] 1 -> 2  8  / 20       16
+I0000 00:00:1762805710.891670 39641568 simple_min_cost_flow_program.cc:70] 1 -> 3  4  / 4       8
+I0000 00:00:1762805710.891671 39641568 simple_min_cost_flow_program.cc:70] 1 -> 4  0  / 10       0
+I0000 00:00:1762805710.891673 39641568 simple_min_cost_flow_program.cc:70] 2 -> 3  12  / 15       12
+I0000 00:00:1762805710.891674 39641568 simple_min_cost_flow_program.cc:70] 2 -> 4  4  / 4       12
+I0000 00:00:1762805710.891676 39641568 simple_min_cost_flow_program.cc:70] 3 -> 4  11  / 20       22
+I0000 00:00:1762805710.891678 39641568 simple_min_cost_flow_program.cc:70] 4 -> 2  0  / 5       0
+<end of output>
+Test time =   0.14 sec
+----------------------------------------------------------
+Test Passed.
+"test_simple_min_cost_flow_program" end time: Nov 10 13:15 MST
+"test_simple_min_cost_flow_program" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

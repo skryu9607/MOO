@@ -1,0 +1,120 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_nurses_sat
+1/1 Test: test_nurses_sat
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/nurses_sat/build/bin/nurses_sat"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/nurses_sat/build
+"test_nurses_sat" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1762805729.517354 39643994 nurses_sat.cc:148] Solution 0
+I0000 00:00:1762805729.517368 39643994 nurses_sat.cc:150] Day 0
+I0000 00:00:1762805729.517370 39643994 nurses_sat.cc:162]   Nurse 0 does not work
+I0000 00:00:1762805729.517371 39643994 nurses_sat.cc:157]   Nurse 1 works shift 0
+I0000 00:00:1762805729.517372 39643994 nurses_sat.cc:157]   Nurse 2 works shift 1
+I0000 00:00:1762805729.517373 39643994 nurses_sat.cc:157]   Nurse 3 works shift 2
+I0000 00:00:1762805729.517375 39643994 nurses_sat.cc:150] Day 1
+I0000 00:00:1762805729.517376 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517377 39643994 nurses_sat.cc:162]   Nurse 1 does not work
+I0000 00:00:1762805729.517378 39643994 nurses_sat.cc:157]   Nurse 2 works shift 1
+I0000 00:00:1762805729.517379 39643994 nurses_sat.cc:157]   Nurse 3 works shift 0
+I0000 00:00:1762805729.517380 39643994 nurses_sat.cc:150] Day 2
+I0000 00:00:1762805729.517381 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517383 39643994 nurses_sat.cc:157]   Nurse 1 works shift 1
+I0000 00:00:1762805729.517383 39643994 nurses_sat.cc:157]   Nurse 2 works shift 0
+I0000 00:00:1762805729.517385 39643994 nurses_sat.cc:162]   Nurse 3 does not work
+I0000 00:00:1762805729.517397 39643994 nurses_sat.cc:148] Solution 1
+I0000 00:00:1762805729.517398 39643994 nurses_sat.cc:150] Day 0
+I0000 00:00:1762805729.517399 39643994 nurses_sat.cc:157]   Nurse 0 works shift 0
+I0000 00:00:1762805729.517401 39643994 nurses_sat.cc:162]   Nurse 1 does not work
+I0000 00:00:1762805729.517401 39643994 nurses_sat.cc:157]   Nurse 2 works shift 1
+I0000 00:00:1762805729.517402 39643994 nurses_sat.cc:157]   Nurse 3 works shift 2
+I0000 00:00:1762805729.517403 39643994 nurses_sat.cc:150] Day 1
+I0000 00:00:1762805729.517404 39643994 nurses_sat.cc:162]   Nurse 0 does not work
+I0000 00:00:1762805729.517405 39643994 nurses_sat.cc:157]   Nurse 1 works shift 2
+I0000 00:00:1762805729.517406 39643994 nurses_sat.cc:157]   Nurse 2 works shift 1
+I0000 00:00:1762805729.517407 39643994 nurses_sat.cc:157]   Nurse 3 works shift 0
+I0000 00:00:1762805729.517408 39643994 nurses_sat.cc:150] Day 2
+I0000 00:00:1762805729.517409 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517410 39643994 nurses_sat.cc:157]   Nurse 1 works shift 1
+I0000 00:00:1762805729.517411 39643994 nurses_sat.cc:157]   Nurse 2 works shift 0
+I0000 00:00:1762805729.517412 39643994 nurses_sat.cc:162]   Nurse 3 does not work
+I0000 00:00:1762805729.517422 39643994 nurses_sat.cc:148] Solution 2
+I0000 00:00:1762805729.517423 39643994 nurses_sat.cc:150] Day 0
+I0000 00:00:1762805729.517424 39643994 nurses_sat.cc:157]   Nurse 0 works shift 0
+I0000 00:00:1762805729.517425 39643994 nurses_sat.cc:162]   Nurse 1 does not work
+I0000 00:00:1762805729.517426 39643994 nurses_sat.cc:157]   Nurse 2 works shift 1
+I0000 00:00:1762805729.517427 39643994 nurses_sat.cc:157]   Nurse 3 works shift 2
+I0000 00:00:1762805729.517428 39643994 nurses_sat.cc:150] Day 1
+I0000 00:00:1762805729.517428 39643994 nurses_sat.cc:157]   Nurse 0 works shift 1
+I0000 00:00:1762805729.517429 39643994 nurses_sat.cc:157]   Nurse 1 works shift 2
+I0000 00:00:1762805729.517430 39643994 nurses_sat.cc:162]   Nurse 2 does not work
+I0000 00:00:1762805729.517431 39643994 nurses_sat.cc:157]   Nurse 3 works shift 0
+I0000 00:00:1762805729.517432 39643994 nurses_sat.cc:150] Day 2
+I0000 00:00:1762805729.517433 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517434 39643994 nurses_sat.cc:157]   Nurse 1 works shift 1
+I0000 00:00:1762805729.517434 39643994 nurses_sat.cc:157]   Nurse 2 works shift 0
+I0000 00:00:1762805729.517435 39643994 nurses_sat.cc:162]   Nurse 3 does not work
+I0000 00:00:1762805729.517444 39643994 nurses_sat.cc:148] Solution 3
+I0000 00:00:1762805729.517445 39643994 nurses_sat.cc:150] Day 0
+I0000 00:00:1762805729.517446 39643994 nurses_sat.cc:157]   Nurse 0 works shift 0
+I0000 00:00:1762805729.517447 39643994 nurses_sat.cc:162]   Nurse 1 does not work
+I0000 00:00:1762805729.517448 39643994 nurses_sat.cc:157]   Nurse 2 works shift 1
+I0000 00:00:1762805729.517448 39643994 nurses_sat.cc:157]   Nurse 3 works shift 2
+I0000 00:00:1762805729.517449 39643994 nurses_sat.cc:150] Day 1
+I0000 00:00:1762805729.517450 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517451 39643994 nurses_sat.cc:157]   Nurse 1 works shift 1
+I0000 00:00:1762805729.517452 39643994 nurses_sat.cc:162]   Nurse 2 does not work
+I0000 00:00:1762805729.517453 39643994 nurses_sat.cc:157]   Nurse 3 works shift 0
+I0000 00:00:1762805729.517454 39643994 nurses_sat.cc:150] Day 2
+I0000 00:00:1762805729.517455 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517456 39643994 nurses_sat.cc:157]   Nurse 1 works shift 1
+I0000 00:00:1762805729.517457 39643994 nurses_sat.cc:157]   Nurse 2 works shift 0
+I0000 00:00:1762805729.517458 39643994 nurses_sat.cc:162]   Nurse 3 does not work
+I0000 00:00:1762805729.517465 39643994 nurses_sat.cc:148] Solution 4
+I0000 00:00:1762805729.517467 39643994 nurses_sat.cc:150] Day 0
+I0000 00:00:1762805729.517467 39643994 nurses_sat.cc:162]   Nurse 0 does not work
+I0000 00:00:1762805729.517468 39643994 nurses_sat.cc:157]   Nurse 1 works shift 0
+I0000 00:00:1762805729.517469 39643994 nurses_sat.cc:157]   Nurse 2 works shift 1
+I0000 00:00:1762805729.517470 39643994 nurses_sat.cc:157]   Nurse 3 works shift 2
+I0000 00:00:1762805729.517471 39643994 nurses_sat.cc:150] Day 1
+I0000 00:00:1762805729.517472 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517473 39643994 nurses_sat.cc:157]   Nurse 1 works shift 1
+I0000 00:00:1762805729.517474 39643994 nurses_sat.cc:162]   Nurse 2 does not work
+I0000 00:00:1762805729.517475 39643994 nurses_sat.cc:157]   Nurse 3 works shift 0
+I0000 00:00:1762805729.517476 39643994 nurses_sat.cc:150] Day 2
+I0000 00:00:1762805729.517477 39643994 nurses_sat.cc:157]   Nurse 0 works shift 2
+I0000 00:00:1762805729.517478 39643994 nurses_sat.cc:157]   Nurse 1 works shift 1
+I0000 00:00:1762805729.517478 39643994 nurses_sat.cc:157]   Nurse 2 works shift 0
+I0000 00:00:1762805729.517480 39643994 nurses_sat.cc:162]   Nurse 3 does not work
+I0000 00:00:1762805729.517480 39643994 nurses_sat.cc:169] Stop search after 5 solutions.
+I0000 00:00:1762805729.517500 39643994 nurses_sat.cc:180] Statistics
+I0000 00:00:1762805729.517501 39643994 nurses_sat.cc:181] CpSolverResponse summary:
+status: FEASIBLE
+objective: 0
+best_bound: 0
+integers: 36
+booleans: 36
+conflicts: 5
+branches: 358
+propagations: 685
+integer_propagations: 1019
+restarts: 149
+lp_iterations: 0
+walltime: 0.001689
+usertime: 0.001689
+deterministic_time: 0.000254143
+gap_integral: 0
+solution_fingerprint: 0x1d293e0fcff90608
+
+I0000 00:00:1762805729.517509 39643994 nurses_sat.cc:182] solutions found : 5
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"test_nurses_sat" end time: Nov 10 13:15 MST
+"test_nurses_sat" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

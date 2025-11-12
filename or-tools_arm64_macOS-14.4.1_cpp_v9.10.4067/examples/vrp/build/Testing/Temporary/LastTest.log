@@ -1,0 +1,36 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_vrp
+1/1 Test: test_vrp
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/vrp/build/bin/vrp"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/vrp/build
+"test_vrp" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1762805725.067378 39643464 vrp.cc:78] Objective: 4384
+I0000 00:00:1762805725.067420 39643464 vrp.cc:82] Route for Vehicle 0:
+I0000 00:00:1762805725.067434 39643464 vrp.cc:92] 0 -> 0
+I0000 00:00:1762805725.067435 39643464 vrp.cc:93] Distance of the route: 0m
+I0000 00:00:1762805725.067436 39643464 vrp.cc:82] Route for Vehicle 1:
+I0000 00:00:1762805725.067437 39643464 vrp.cc:92] 0 -> 0
+I0000 00:00:1762805725.067438 39643464 vrp.cc:93] Distance of the route: 0m
+I0000 00:00:1762805725.067440 39643464 vrp.cc:82] Route for Vehicle 2:
+I0000 00:00:1762805725.067441 39643464 vrp.cc:92] 0 -> 0
+I0000 00:00:1762805725.067442 39643464 vrp.cc:93] Distance of the route: 0m
+I0000 00:00:1762805725.067443 39643464 vrp.cc:82] Route for Vehicle 3:
+I0000 00:00:1762805725.067446 39643464 vrp.cc:92] 0 -> 9 -> 5 -> 8 -> 6 -> 2 -> 10 -> 16 -> 14 -> 13 -> 12 -> 11 -> 15 -> 3 -> 4 -> 1 -> 7 -> 0
+I0000 00:00:1762805725.067447 39643464 vrp.cc:93] Distance of the route: 4384m
+I0000 00:00:1762805725.067449 39643464 vrp.cc:96] Total distance of all routes: 4384m
+I0000 00:00:1762805725.067450 39643464 vrp.cc:97] 
+I0000 00:00:1762805725.067451 39643464 vrp.cc:98] Advanced usage:
+I0000 00:00:1762805725.067451 39643464 vrp.cc:99] Problem solved in 1ms
+<end of output>
+Test time =   0.17 sec
+----------------------------------------------------------
+Test Passed.
+"test_vrp" end time: Nov 10 13:15 MST
+"test_vrp" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST

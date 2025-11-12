@@ -1,0 +1,30 @@
+Start testing: Nov 10 13:15 MST
+----------------------------------------------------------
+1/1 Testing: test_simple_mip_program
+1/1 Test: test_simple_mip_program
+Command: "/Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_mip_program/build/bin/simple_mip_program"
+Directory: /Users/seung/MOO/or-tools_arm64_macOS-14.4.1_cpp_v9.10.4067/examples/simple_mip_program/build
+"test_simple_mip_program" start time: Nov 10 13:15 MST
+Output:
+----------------------------------------------------------
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1762805714.358789 39642170 simple_mip_program.cc:39] Number of variables = 2
+I0000 00:00:1762805714.358808 39642170 simple_mip_program.cc:53] Number of constraints = 2
+I0000 00:00:1762805714.359143 39642170 simple_mip_program.cc:73] Solution:
+I0000 00:00:1762805714.359146 39642170 simple_mip_program.cc:74] Objective value = 23
+I0000 00:00:1762805714.359148 39642170 simple_mip_program.cc:75] x = 3
+I0000 00:00:1762805714.359151 39642170 simple_mip_program.cc:76] y = 2
+I0000 00:00:1762805714.359152 39642170 simple_mip_program.cc:80] 
+Advanced usage:
+I0000 00:00:1762805714.359152 39642170 simple_mip_program.cc:81] Problem solved in 1 milliseconds
+I0000 00:00:1762805714.359154 39642170 simple_mip_program.cc:82] Problem solved in 0 iterations
+I0000 00:00:1762805714.359156 39642170 simple_mip_program.cc:83] Problem solved in 1 branch-and-bound nodes
+<end of output>
+Test time =   0.15 sec
+----------------------------------------------------------
+Test Passed.
+"test_simple_mip_program" end time: Nov 10 13:15 MST
+"test_simple_mip_program" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 10 13:15 MST
