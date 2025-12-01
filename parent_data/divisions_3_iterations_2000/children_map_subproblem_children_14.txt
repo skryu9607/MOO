@@ -1,0 +1,3 @@
+Children Map for Subproblem Tree 14
+======================================
+Parent ID (x, y) -> [List of Children IDs (x, y)]

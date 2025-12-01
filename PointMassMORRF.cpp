@@ -20,7 +20,7 @@
 // Basic constatns // 
 double PI = 3.14159265358979323846;
 double X_MAX = 25.0;
-double Y_MAX = 25.0;
+double Y_MAX = 30.0;
 
 struct State{
     // Default 
@@ -120,25 +120,56 @@ class MORRFplanner{
         }
 
         // Lambda : uniform distributions
+        // lambdas.clear();
+        // for (int i = 0; i <= num_divs; ++i) {
+        //     for (int j = 0; j <= num_divs - i; ++j) {
+        //         int k = num_divs - i - j; 
+
+        //         std::vector<double> vec(3);
+        //         vec[0] = (double)i / num_divs;
+        //         vec[1] = (double)j / num_divs;
+        //         vec[2] = (double)k / num_divs;
+
+        //         lambdas.push_back(vec);
+        //     }
+        // }
         lambdas.clear();
-        for (int i = 0; i <= num_divs; ++i) {
-            for (int j = 0; j <= num_divs - i; ++j) {
-                int k = num_divs - i - j; 
-
-                std::vector<double> vec(3);
-                vec[0] = (double)i / num_divs;
-                vec[1] = (double)j / num_divs;
-                vec[2] = (double)k / num_divs;
-
-                lambdas.push_back(vec);
-            }
-        }
+        std::vector<std::vector<double>>Test_Lambda_Set = 
+                            {{0.0, 0.0, 1.0},
+                            {0.0, 1.0, 0.0},
+                            {1.0, 0.0, 0.0},
+                            {0.99, 0.0, 0.01},
+                            {0.0, 0.99, 0.01},
+                            {0.01, 0.99, 0.0},
+                            {0.01, 0.0, 0.99},
+                            {0.0, 0.01, 0.99},
+                            {0.99, 0.02, 0.0},
+                            {0.98, 0.0, 0.02},
+                            {0.0, 0.98, 0.02},
+                            {0.02, 0.98, 0.0},
+                            {0.02, 0.0, 0.98},
+                            {0.0, 0.02, 0.98},
+                            {0.98, 0.02, 0.0},
+                            {0.97, 0.0, 0.03},
+                            {0.0, 0.97, 0.03},
+                            {0.03, 0.97, 0.0},
+                            {0.03, 0.0, 0.97},
+                            {0.0, 0.03, 0.97},
+                            {0.97, 0.03, 0.0},
+                            {0.9, 0.05, 0.05},
+                            {0.05, 0.9, 0.05},
+                            {0.05, 0.9, 0.05},
+                            {0.05, 0.05, 0.9},
+                            {0.05, 0.05, 0.9},
+                            {0.9, 0.05, 0.05},
+                            {1/3, 1/3, 1/3}};
+        lambdas = Test_Lambda_Set;
         std::cout << "The number of lambdas generated: " << lambdas.size() << std::endl;
-        int num_sub;
-        num_sub = (num_divs + 2) * (num_divs + 1) /2;
-        if (num_objectives == 3 && num_sub != lambdas.size()){
-            throw std::runtime_error("Error in generating lambdas for 3 objectives.");
-        };
+        int num_sub = lambdas.size();
+        // num_sub = (num_divs + 2) * (num_divs + 1) /2;
+        // if (num_objectives == 3 && num_sub != lambdas.size()){
+        //     throw std::runtime_error("Error in generating lambdas for 3 objectives.");
+        // };
         //Subproblem trees Initialization
         subproblem_trees.resize(num_sub);
         for (size_t k = 0; k < num_sub; ++k){
@@ -411,13 +442,13 @@ void MORRFplanner::saveChildrenMapToTxt(const std::string& prefix) const {
 State sampleState(){
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    static std::uniform_real_distribution<> dis_x(0.0, X_MAX);
-    static std::uniform_real_distribution<> dis_y(0.0, Y_MAX);
-
+    static std::uniform_real_distribution<> dis_x(0, +X_MAX);
+    static std::uniform_real_distribution<> dis_y(-10, +Y_MAX);
+    //static std::uniform_real_distribution<> dis_y(-50, +25);
     State s;
     s.x = dis_x(gen);
     s.y = dis_y(gen);
-    if (stateDistance(s,State{10.0,10.0}) >= 3.0){
+    if (stateDistance(s,State{11.0,13.0}) >= 3.0){
         return s;
     }
 
@@ -427,7 +458,7 @@ State steer(const State&s_from, const State&s_to){
     double direction = atan2(s_to.y - s_from.y, s_to.x - s_from.x);
     State new_state;
     double dist = stateDistance(s_from, s_to);
-    double eta = 2.0;
+    double eta = 0.5;
     if (dist <= eta) {
         new_state = s_to;
     } else {
@@ -444,7 +475,7 @@ Trajectory line(const State& s_from, const State& s_to){
     int num_steps = 31;
 
     for (int i = 1; i <= num_steps; ++i){
-        double ratio = i / num_steps;
+        double ratio = (double) i / num_steps;
         State intermediate;
         intermediate.x = s_from.x + ratio * (s_to.x - s_from.x);
         intermediate.y = s_from.y + ratio * (s_to.y - s_from.y);
@@ -456,7 +487,7 @@ Trajectory line(const State& s_from, const State& s_to){
 bool isObstacleFree(const Trajectory& traj){
     State s_from = traj.path.front();
     State s_to = traj.path.back();
-    double threshold = 3.0 + 0.5;
+    double threshold = 3.0;
     int num_steps = 31;
     for (int i = 0; i <= num_steps; ++i){
         double ratio = static_cast<double>(i) / num_steps; 
@@ -464,7 +495,7 @@ bool isObstacleFree(const Trajectory& traj){
         intermediate.x = s_from.x + ratio * (s_to.x - s_from.x);
         intermediate.y = s_from.y + ratio * (s_to.y - s_from.y);
         double dist = stateDistance(intermediate, State{11.0,13.0});
-        if (dist < threshold){
+        if (dist <= threshold){
             return false;
         }
         else{
@@ -507,7 +538,7 @@ void MORRFplanner::run(int max_iterations){
 
         //std::cout << "------ Iteration " << i << " | Sampled State: (" << x_rand.x << ", " << x_rand.y << ")" << std::endl;
         //double search_radius = 30.0 * std::sqrt((std::log(G_nodes.size() + 1.0) / (G_nodes.size() + 1.0)));
-        double search_radius = 2.0;
+        double search_radius = 0.5;
         std::shared_ptr<Node> NstNode = getNearestNode(x_rand,search_radius);
         //std::cout<<"NstNode ID: " << NstNode->id << std::endl;
         
@@ -743,18 +774,20 @@ double calculateTchebycheffFitness(const std::vector<double>& cost_vec, const st
 
 std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to){
     std::vector<double> cost(3.0,0.0);
+    //cost[0] = stateDistance(s_from,s_to)/20.0;
     cost[0] = stateDistance(s_from,s_to);
-
     const double obstacle_cx = 11.0;
     const double obstacle_cy = 13.0;
     const double radius = 3.0;
     double risk = 0.0;
-    int num_steps = 31;
+    int num_steps = 16;
     double intermediate_dist = 0.0;
     State previous_intermediate_risk = State{s_from.x, s_from.y};
     double inverse_risk_segment;
+    double sum_segment_risk;
     State intermediate_State_risk;
     State CenterOfSegment;
+    double R = 5000;
     for (int i = 1; i <= num_steps; ++i){
         double ratio = (double)i / num_steps;
         
@@ -770,19 +803,19 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
         // std::cout << "Previous Intermediate State: " << previous_intermediate_risk.x << ", " << previous_intermediate_risk.y << std::endl;
         // std::cout << "CenterOfSegment: " << CenterOfSegment.x << ", " << CenterOfSegment.y << std::endl;
         // std::cout << "distance between segment: " << stateDistance(intermediate_State_risk, previous_intermediate_risk) << std::endl;
-        inverse_risk_segment = (stateDistance(CenterOfSegment, State{11.0,13.0}) - radius) * stateDistance(intermediate_State_risk, previous_intermediate_risk);
+        inverse_risk_segment = (stateDistance(CenterOfSegment, State{11.0,13.0}) - radius) * (stateDistance(CenterOfSegment, State{11.0,13.0}) - radius) ;
         if (inverse_risk_segment < 0.0){
-            inverse_risk_segment = 0.01;
+            inverse_risk_segment = 0.001;
         }
 
         previous_intermediate_risk = State{intermediate_State_risk.x, intermediate_State_risk.y};
 
-        risk += 1/ inverse_risk_segment;
+        sum_segment_risk += inverse_risk_segment;
         //std::cout << "risk " << inverse_risk_segment << std::endl;
     }
-
+    //risk = std::min(R,1.0 /sum_segment_risk)
     //dist /= num_steps; 
-
+    risk = 10. * (1.0/sum_segment_risk) * stateDistance(s_from,s_to)/num_steps;
     cost[1] = risk;
     if (risk < 0.0) {
         std::cout << "Risk" << risk << std::endl;
@@ -810,6 +843,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
         previous_intermediate_traveltime = intermediate_traveltime;
     }
 
+    //cost[2] = Time/2.1;
     cost[2] = Time;
     //cost[2] = cost[1];
 
@@ -821,9 +855,9 @@ int main(){
     State start = {1.0, 15.0};
     State goal = {21.0,15.0};
     int num_objectives = 3;
-    int divisions = 20;
-    double threshold = 0.5;
-    int iterations = 10000;
+    int divisions = 6;
+    double threshold = 0.25;
+    int iterations = 80000;
     MORRFplanner planner(start, goal, threshold, num_objectives, divisions);
     // 3. running the planner
     std::cout << "Starting MORRF* planning with Kinematic point mass..." << std::endl;
@@ -861,7 +895,7 @@ int main(){
 0. Check the search radius and propagation radius -> done (both are 2.0)
 1. Refine the mathematical formulation
 2. Refine and check the cost 1 -> done 
-3. Make sure my trajectories very near-optimal.
+3. Make sure my trajectories very near-optimal. -> done.
 
 4. Order of new simcard
 5. Change the antenna.

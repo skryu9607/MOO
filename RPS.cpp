@@ -1,143 +1,92 @@
-#include "RPS_IPlanner.h"
-#include <stdexcept>
-#include <memory>
+/*
+ * MRPS Hybrid Implementation
+ * 1. Regret LP Solver: Gurobi Optimizer
+ * 2. Robot Planner: OMPL (RRT*)
+ */
+
 #include <iostream>
-#include <cmath>
 #include <vector>
-#include <string>
-#include <limits>
+#include <cmath>
+#include <numeric>
+#include <algorithm>
+#include <iomanip>
+#include <queue>
+#include <memory>
 
-class MockPlanner : public IPlanner {
-public:
-    ComplexMockPlanner(int objectives) {
+// --- Gurobi Header ---
+#include "gurobi_c++.h"
 
-        pf_points = {
-            {1.0, 15.0}, // A
-            {2.0, 10.0}, // B
-            {3.0, 7.0},  // C
-            {5.0, 5.0},  // D
-            {7.0, 3.0},  // E
-            {10.0, 2.0}, // F
-            {15.0, 1.0}  // G
-        };
-    }
+// --- OMPL Headers ---
+#include <ompl/base/SpaceInformation.h>
+#include <ompl/base/spaces/SE2StateSpace.h>
+#include <ompl/geometric/SimpleSetup.h>
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/base/objectives/PathLengthOptimizationObjective.h>
+#include <ompl/base/objectives/StateCostIntegralObjective.h>
+#include <ompl/base/objectives/OptimizationObjective.h>
 
-    /**
-     * @brief w·f를 최소화하는 해 (PF 점들 중 하나)의 f 벡터를 반환합니다.
-     */
-    Vector solve(const Vector& w) override {
-        double w1 = w[0];
-        double w2 = w[1];
-        
-        double min_cost = std::numeric_limits<double>::infinity();
-        Vector best_f = pf_points[0];
+using namespace std;
+namespace ob = ompl::base;
+namespace og = ompl::geometric;
 
-        // 7개의 점을 모두 순회하며 w·f가 가장 작은 점을 찾음
-        for (const auto& f_point : pf_points) {
-            double cost = w1 * f_point[0] + w2 * f_point[1];
-            if (cost < min_cost) {
-                min_cost = cost;
-                best_f = f_point;
-            }
-        }
-        return best_f;
-    }
+// ---------------------------------------------------------
+// 1. Basic Structures
+// ---------------------------------------------------------
 
-private:
-    Solutions pf_points; // f-vector들의 집합
-};
-class RegretSampler {
-    private:
-    std::unique_ptr<IPlanner> planner;
-    Solutions omega; 
-    int m;
-    Solutions omega_L;
+using Vector = std::vector<double>;
 
-    Vector findNextWeight(){
-        Vector w_star(m,0.0);
-        double max_regret = -std::numeric_limits<double>::infinity();
-        int num_grid_samples = 101;
-        for (int i = 0; i< num_grid_samples;++i){
-            Vector w_grid(m);
-            w_grid[0] = (double) i / (num_grid_samples-1);
-            w_grid[1] = 1.0 - w_grid[0];
-
-            double x_w = std::numeric_limits<double>::infinity();
-            for(const auto& sol : omega){
-                double w_dot_f = w_grid[0] * sol.objectives[0] + w_grid[1] * sol.objectives[1];
-                x_w = std::min(x_w,w_dot_f);
-            }
-            double p_w = -std::numeric_limits<double>::infinity();
-            for(const auto& sol : omega){
-                double w_minus_w_prime_dot_f = 0.0;
-                for (int j = 0;j<m;++j){
-                    w_minus_w_prime_dot_f += (w_grid[j] - sol.weight[j]) * sol.objectives[j];
-                }
-                double lower_bound_term = sol.cost + w_minus_w_prime_dot_f;
-                p_w = std::max(p_w,lower_bound_term);
-            }
-            double current_regret_upper_bound = x_w - p_w;
-            if (current_regret_upper_bound > max_regret){
-                max_regret = current_regret_upper_bound;
-                w_star = w_grid;
-                if (max_regret == 0.0) {
-                    break;
-                }
-            }
-        }
-        std::cout << "Worst Regret : " << max_regret << " at w*: [" << w_star[0] << ", " << w_star[1] << "]" << std::endl;
-        
-        return w_star;
-    
+double dot(const Vector& a, const Vector& b) {
+    double sum = 0.0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        sum += a[i] * b[i];
     };
+    return sum;
+}
 
-    public:
-        RegretSampler(std::unique_ptr<IPlanner> p, int num_objectives):planner(std::move(p)),m(num_objectives){}
+void printVec(const Vector& v) {
+    std::cout << "[";
+    for (size_t i = 0; i < v.size(); ++i) {
+        std::cout << (i > 0 ? ", " : "") << std::fixed << std::setprecision(4) << v[i];
+    };
+    std::cout << "]";
+}
 
-    void initialize(){
-        omega.clear();
-        std::cout << "Initializing Omega with vertex weights..." << std::endl;
-        for (int i = 0;i<m;++i){
-            Vector w_vertex(m,0.0);
-            w_vertex[i] = 1.0; 
-            Vector obj = planner->solve(w_vertex); 
-            omega.emplace_back(w_vertex,obj);
-        }
-    }
-    void run(int K) {
-        if (omega.empty()){
-            initialize(); 
-        }
-        while (omega.size()< K) {
-            std::cout << "Repeat this process " << omega.size() + 1 << "/" << K << "..." << std::endl;
-            Vector w_star = findNextWeight();
-            Vector f_star = planner->solve(w_star);
-            omega.emplace_back(w_star,f_star);
-        if 
-        }
-
-        std::cout << "Total " << K << " samples are done." << std::endl;
-    }
-    const Solutions& getOmega() const{return omega;}
+// In this case, this is "f".
+struct PlannerSolution {
+    Vector objectives; // [Cost1, Cost2]
 };
 
-int main(){
-    int m = 2;
-    int K = 6;
-    try { 
-        auto planner_ptr = std::make_unique<MockPlanner>(m);
-        RegretSampler sampler(std::move(planner_ptr),m);
-        sampler.run(K);
-        std::cout << "Final Omega set:" << std::endl;
-        for (const auto& sol : sampler.getOmega()){
-            std::cout << " w' = [" << sol.weight[0] << ", " << sol.weight[1] << "]"
-                      << " -> f(s*) = [" << sol.objectives[0] << ", " << sol.objectives[1] << "]"
-                      << " (cost u(w') = " << sol.cost << ")" << std::endl;
+class RobotPlanner {
+public:
+    virtual PlannerSolution solve(const Vector& weights) = 0;
+    virtual int getNumObjectives() const = 0;
+    virtual ~RobotPlanner() = default;
+};
+
+// ---------------------------------------------------------
+// 2. Gurobi Regret Solver (LP Solver)
+// ---------------------------------------------------------
+// MRPS 알고리즘 내부의 Regret Maximization 문제를 Gurobi로 해결
+class GurobiRegretSolver{
+    GRBEnv& env;
+    public:
+    struct Result{
+        bool success;
+        double objectiveValue;
+        Vector solution;
+    };
+    GurobiRegretSolver(GRBEnv& env_ref) : env(env_ref) {}
+    // Solve : Maximize c^T x s.t. Ax <= b, x >= 0
+    Result solve(const std::vector<Vector>& A, const Vector& b, const Vector& c){
+        GRBModel model(env);
+        model.set(GRB_IntParam_OutputFlag,0);
+        int num_vars = c.size();
+        int num_constrs = b.size();
+
+        std::vector<GRBVar> vars(num_vars);
+        for (int i = 0; i < num_vars; ++i){
+            vars[i] = model.addVar(0.0, GRB_infinity, 0.0, GRB_continou)
+
         }
     }
-    catch (const std::exception& e){
-        std::cerr << "Error occurred: " << e.what() << std::endl;
-        return 1;
-    }
-    return 0;
 }

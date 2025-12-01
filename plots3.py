@@ -96,18 +96,22 @@ def find_pareto_front(df):
 # ---------------------------------------------------------
 # 3. Load Data & Preprocess
 # ---------------------------------------------------------
+
+#results_filename = 'results_sub_66_iterations_8000.csv'
+#results_filename = 'results_sub_231_iterations_10000.csv'
+#results_filename = 'results_sub_21_iterations_6000.csv'
 results_filename = 'results.csv'
-#results_filename = 'Important_results_sub_231_iterations_10000.csv'
+#results_filename = 'results_sub_496_iterations_20000.csv'
+#results_filename = 'results_sub_496_iterations_20000_finercsv'
+#results_filename = 'results_nonzero_iterations_80000.csv'
 df = parse_raw_data(results_filename)
 
 if df.empty:
     print("DataFrame is empty. Exiting.")
     exit()
 
-# [중요] ID 부여: 나중에 필터링을 하더라도 고유 ID는 변하지 않게 하기 위함
 df['ID'] = range(len(df)) 
-df['Risk'] = df['Risk'] / 1000.0
-print("[Info] Risk values divided by 1000 for plotting.")
+df['Risk'] = df['Risk'] / 1.0
 df = find_pareto_front(df)
 
 df_pareto = df[df['is_pareto']]
@@ -131,13 +135,12 @@ print(f"\n[Info] ID matching table saved to '{mapping_file}'")
 # ---------------------------------------------------------
 # 4. Plotting Configuration
 # ---------------------------------------------------------
-# 전체 색상 맵
 colors = cm.rainbow(np.linspace(0, 1, len(df)))
 
 # ---------------------------------------------------------
 # Figure 1: Workspace (Path Visualization) - Selected Only
 # ---------------------------------------------------------
-plt.figure(figsize=(14, 10)) # 범례가 길어질 수 있으므로 가로 폭을 조금 늘림
+plt.figure(figsize=(14, 10)) 
 
 # [NEW] Obstacle Plotting
 obstacle_center = (11, 13)
@@ -145,11 +148,11 @@ obstacle_radius = 3.0
 circle = patches.Circle(obstacle_center, obstacle_radius, 
                         edgecolor='red', 
                         facecolor='red', 
-                        alpha=0.3, # 반투명하게
-                        zorder=1, # 가장 뒤에 그려지도록
+                        alpha=0.3, 
+                        zorder=1, 
                         label='Obstacle')
 plt.gca().add_patch(circle)
-plt.scatter(obstacle_center[0], obstacle_center[1], marker='x', color='red', s=100, zorder=2) # 중심점 표시
+plt.scatter(obstacle_center[0], obstacle_center[1], marker='x', color='red', s=100, zorder=2) 
 
 
 # Filter Logic for Trajectories
@@ -176,41 +179,63 @@ for idx, row in df.iterrows():
             found_targets.append(idx)
             break
 
-# 2. Pick Random 10 from the rest
+# 2. Pick Random 43 from the rest
 remaining_indices = [i for i in df.index if i not in selected_indices]
-random_sample_count = min(10, len(remaining_indices))
+random_sample_count = min(43, len(remaining_indices))
 random_indices = random.sample(remaining_indices, random_sample_count)
 
 final_plot_indices = selected_indices + random_indices
 final_plot_indices = sorted(list(set(final_plot_indices))) # Sort and remove duplicates
 
-print(f"[Info] Figure 1 will plot {len(final_plot_indices)} paths (Targets: {len(found_targets)}, Random: {len(random_indices)})")
+print(f"[Info] Figure 1 will plot {len(final_plot_indices) + 1} paths (Targets: {len(found_targets)}, Random: {len(random_indices)})")
 
 # --- Plot Paths (Only Selected) ---
+pure_targets = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+
 for index in final_plot_indices:
     row = df.iloc[index]
     try:
         path_x = [float(x) for x in row['Paths.x'].split(';') if x.strip()]
         path_y = [float(y) for y in row['Paths.y'].split(';') if y.strip()]
 
-        # [MODIFIED] Label: Show Weights instead of ID
-        # Weights format in CSV is usually "0.33;0.33;0.33". 
-        # Let's format it nicely to "w=[0.33, 0.33, 0.33]" or similar.
+        # Weights string for label
         weights_str = row['Weights'].replace(';', ', ')
         path_label = f"w=[{weights_str}]"
         
-        # Styles
-        lw = 3.0 if row['is_pareto'] else 1.5 
-        alpha = 1.0 if row['is_pareto'] else 0.5
+        # Parse weights for checking
+        w_vals = [float(x) for x in row['Weights'].split(';')]
+
+        # [MODIFIED] Special styling for pure weights
+        is_pure = False
+        for pt in pure_targets:
+            if np.allclose(w_vals, pt, atol=0.01):
+                is_pure = True
+                break
         
+        if is_pure:
+            # 단일 목적함수(Pure weights)인 경우: 진하게, 다른 마커
+            lw = 2.0      # 더 두껍게
+            alpha = 1.0   # 불투명
+            marker_style = 'd' # Diamond marker (기본 'o'와 다르게)
+            line_style = ':'
+            zorder_val = 10 # 맨 위에 그리기
+        else:
+            # 일반 경로
+            lw = 1.0 if row['is_pareto'] else 1.5 
+            alpha = 1.0 if row['is_pareto'] else 0.5
+            marker_style = 'o' # Circle
+            line_style = ':'
+            zorder_val = 3
+
         plt.plot(path_x, path_y,
-                 marker='o',
-                 markersize=4,
+                 marker=marker_style,
+                 markersize=6 if is_pure else 4, # Pure weights는 마커도 조금 더 크게
                  linewidth=lw,
-                 color=colors[index], # Use global color map based on original index
+                 linestyle=line_style,
+                 color=colors[index], 
                  label=path_label,
                  alpha=alpha,
-                 zorder=3) # 궤적은 장애물 위에 그려지도록
+                 zorder=zorder_val) 
 
     except Exception as e:
         print(f"Error parsing path at index {index}: {e}")
@@ -223,18 +248,18 @@ if final_plot_indices:
     goal_x = float(first_path_row['Paths.x'].split(';')[-1])
     goal_y = float(first_path_row['Paths.y'].split(';')[-1])
 
-    plt.scatter(start_x, start_y, c='green', s=100, marker='^', zorder=5, label='Start')
-    plt.scatter(goal_x, goal_y, c='red', s=100, marker='*', zorder=5, label='Goal')
+    plt.scatter(start_x, start_y, c='green', s=100, marker='^', zorder=15, label='Start')
+    plt.scatter(goal_x, goal_y, c='red', s=100, marker='*', zorder=15, label='Goal')
 
 
 plt.title('Figure 1: Selected Paths with Obstacle')
 plt.xlabel('X Coordinate')
 plt.ylabel('Y Coordinate')
-# 범례 위치 조정 (그래프 밖으로 뺄 수도 있음, 여기선 우측 상단 유지하되 폰트 줄임)
+# 범례 위치 조정 
 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize='x-small', title="Weights") 
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.gca().set_aspect('equal', adjustable='box')
-plt.tight_layout() # 범례가 잘리지 않도록 레이아웃 자동 조정
+plt.tight_layout() 
 
 
 # ---------------------------------------------------------
@@ -260,19 +285,18 @@ ax.scatter(df_pareto['Length'], df_pareto['Risk'], df_pareto['TravelTime'],
 ax.scatter(utopia_point['Length'], utopia_point['Risk'], utopia_point['TravelTime'],
            marker='*', s=200, c='black', edgecolors='black', zorder=6) 
 
-# Request 2: Only Index ID on points, Remove Legend
-for i, row in df.iterrows():
-    if row['is_pareto'] or i in final_plot_indices:
-        ax.text(row['Length'], row['Risk'], row['TravelTime'], 
-                f"P{row['ID']}",  # Only ID
-                fontsize=9, 
-                ha='left', 
-                va='bottom', 
-                fontweight='bold', 
-                color='black', 
-                zorder=10 
-                )
-
+# # Request 2: Only Index ID on points, Remove Legend
+# for i, row in df.iterrows():
+#     if row['is_pareto'] or i in final_plot_indices:
+#         ax.text(row['Length'], row['Risk'], row['TravelTime'], 
+#                 f"P{row['ID']}",  # Only ID
+#                 fontsize=9, 
+#                 ha='left', 
+#                 va='bottom', 
+#                 fontweight='bold', 
+#                 color='black', 
+#                 zorder=10 
+#                 )
 ax.set_title('Figure 2: 3D Objective Space (ID Only)')
 ax.set_xlabel('Length (Min)')
 ax.set_ylabel('Risk (Min)') 
