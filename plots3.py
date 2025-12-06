@@ -102,8 +102,9 @@ def find_pareto_front(df):
 #results_filename = 'results_sub_21_iterations_6000.csv'
 results_filename = 'results.csv'
 #results_filename = 'results_sub_496_iterations_20000.csv'
-#results_filename = 'results_sub_496_iterations_20000_finercsv'
+#results_filename = 'results_sub_496_iterations_20000_finer.csv'
 #results_filename = 'results_nonzero_iterations_80000.csv'
+#results_filename = 'results_sub_496_iterations'
 df = parse_raw_data(results_filename)
 
 if df.empty:
@@ -124,6 +125,56 @@ utopia_point = {
     'TravelTime': df['TravelTime'].min()
 }
 print(f"Utopia Point: Length={utopia_point['Length']:.4f}, Risk={utopia_point['Risk']:.4f}, Time={utopia_point['TravelTime']:.4f}")
+# ---------------------------------------------------------
+# Sequential (pairwise) cost vector comparison
+# ---------------------------------------------------------
+
+def compare_cost_vectors(df, weight_list, atol=1e-4):
+    """
+    df: parsed DataFrame
+    weight_list: list of weight vectors in order (e.g.,
+                 [[0,0,1],[0,0.01,0.99],[0,0.02,0.98],...])
+    Performs pairwise comparison: w[i] → w[i+1]
+    """
+
+    def parse_w(s):
+        return [float(x) for x in s.split(";")]
+
+    def find_idx(w):
+        matches = df.index[df["Weights"].apply(lambda s: np.allclose(parse_w(s), w, atol=atol))]
+        if len(matches) == 0:
+            raise ValueError(f"Weight {w} not found!")
+        return matches[0]
+
+    def cost_vec(row):
+        return np.array([row["Length"], row["Risk"], row["TravelTime"]], dtype=float)
+
+    print("\n==============================================")
+    print(" SEQUENTIAL COST VECTOR COMPARISON REPORT")
+    print("==============================================\n")
+
+    for i in range(len(weight_list) - 1):
+        w_from = weight_list[i]
+        w_to   = weight_list[i+1]
+
+        idx_from = find_idx(w_from)
+        idx_to   = find_idx(w_to)
+
+        c_from = cost_vec(df.iloc[idx_from])
+        c_to   = cost_vec(df.iloc[idx_to])
+
+        delta = c_to - c_from
+        norm_delta = np.linalg.norm(delta)
+
+        print(f"From Weight {w_from} (Index {idx_from})")
+        print(f"To   Weight {w_to}   (Index {idx_to})")
+        print(f"Cost(from) = {c_from}")
+        print(f"Cost(to)   = {c_to}")
+        print(f"ΔCost      = {delta}")
+        print(f"‖ΔCost‖    = {norm_delta:.6f}")
+        print("----------------------------------------------")
+
+    print("\n==============================================\n")
 
 # ---------------------------------------------------------
 # Request 3: Create ID-Weight Mapping Table
@@ -157,10 +208,13 @@ plt.scatter(obstacle_center[0], obstacle_center[1], marker='x', color='red', s=1
 
 # Filter Logic for Trajectories
 # Target Weights (Approximate matching needed due to float strings)
+# targets = [
+#     [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+#     [0.5, 0.5, 0.0], [0.0, 0.5, 0.5], [0.5, 0.0, 0.5],
+#     [1/3, 1/3, 1/3]
+# ]
 targets = [
-    [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
-    [0.5, 0.5, 0.0], [0.0, 0.5, 0.5], [0.5, 0.0, 0.5],
-    [1/3, 1/3, 1/3]
+    [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]
 ]
 
 selected_indices = []
@@ -174,7 +228,7 @@ for idx, row in df.iterrows():
     
     # Check if this matches any target (allow small epsilon error)
     for t in targets:
-        if np.allclose(w_vals, t, atol=0.01):
+        if np.allclose(w_vals, t, atol=0.0001):
             selected_indices.append(idx)
             found_targets.append(idx)
             break
@@ -208,20 +262,20 @@ for index in final_plot_indices:
         # [MODIFIED] Special styling for pure weights
         is_pure = False
         for pt in pure_targets:
-            if np.allclose(w_vals, pt, atol=0.01):
+            if np.allclose(w_vals, pt, atol=0.0001):
                 is_pure = True
                 break
         
         if is_pure:
             # 단일 목적함수(Pure weights)인 경우: 진하게, 다른 마커
-            lw = 2.0      # 더 두껍게
+            lw = 3.0      # 더 두껍게
             alpha = 1.0   # 불투명
             marker_style = 'd' # Diamond marker (기본 'o'와 다르게)
             line_style = ':'
             zorder_val = 10 # 맨 위에 그리기
         else:
             # 일반 경로
-            lw = 1.0 if row['is_pareto'] else 1.5 
+            lw = 2.0 if row['is_pareto'] else 0.5
             alpha = 1.0 if row['is_pareto'] else 0.5
             marker_style = 'o' # Circle
             line_style = ':'
@@ -229,7 +283,7 @@ for index in final_plot_indices:
 
         plt.plot(path_x, path_y,
                  marker=marker_style,
-                 markersize=6 if is_pure else 4, # Pure weights는 마커도 조금 더 크게
+                 markersize=6 if is_pure else 2, # Pure weights는 마커도 조금 더 크게
                  linewidth=lw,
                  linestyle=line_style,
                  color=colors[index], 
@@ -348,7 +402,26 @@ for ax_sub, (x_col, y_col, title) in zip(axes, plot_configs):
     ax_sub.set_xlabel(x_col)
     ax_sub.set_ylabel(y_col)
     ax_sub.grid(True, linestyle='--', alpha=0.7)
-    
+df = parse_raw_data(results_filename)
+df['ID'] = range(len(df))
+df = find_pareto_front(df)
+compare_cost_vectors(
+    df,          # baseline
+    # weight_list=[
+    #     [0.00, 0.00, 1.00],
+    #     [0.00, 0.01, 0.99],
+    #     [0.00, 0.02, 0.98],
+    #     [0.00, 0.03, 0.97],             
+    # ]
+    # weight_list = [[0.00,1.00,0.00],
+    #                [0.01,0.99,0.00],
+    #                [0.02,0.98,0.00],
+    #                [0.03,0.97,0.00]]
+    weight_list=[[1.00,0.00,0.00],
+                 [0.99,0.00,0.01],
+                 [0.98,0.00,0.02],
+                 [0.97,0.00,0.03]]
+)    
 
 # ---------------------------------------------------------
 ## ✨ Save Figures
@@ -359,3 +432,5 @@ fig3.savefig('Figure3_2D_Projections.png', dpi=300, bbox_inches='tight')
 
 print("Figures saved. showing plots...")
 plt.show()
+
+

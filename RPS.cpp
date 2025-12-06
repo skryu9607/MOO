@@ -63,7 +63,6 @@ std::vector<double> calculateSegmentCost(const StateXY& s_from, const StateXY& s
     double risk = 0.0;
     int num_steps = 16;
     
-    // 변수 초기화 (중요: 사용자 코드에서 누락될 수 있는 초기화 추가)
     double sum_segment_risk = 0.0; 
     
     StateXY previous_intermediate_risk = s_from;
@@ -85,10 +84,9 @@ std::vector<double> calculateSegmentCost(const StateXY& s_from, const StateXY& s
         double dist_to_obs = getEuclideanDist(CenterOfSegment, obstacle);
         double inverse_risk_segment = (dist_to_obs - radius) * (dist_to_obs - radius);
         
-        if (inverse_risk_segment < 0.0) { // 제곱이라 음수일 리 없지만, 사용자 로직 유지
+        if (inverse_risk_segment < 0.0) { /
             inverse_risk_segment = 0.001;
         }
-        // 0에 너무 가까우면 발산 방지
         if (inverse_risk_segment < 0.001) inverse_risk_segment = 0.001;
 
         previous_intermediate_risk = intermediate_State_risk;

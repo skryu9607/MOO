@@ -143,7 +143,7 @@ class MORRFplanner{
                             {0.01, 0.99, 0.0},
                             {0.01, 0.0, 0.99},
                             {0.0, 0.01, 0.99},
-                            {0.99, 0.02, 0.0},
+                            {0.99, 0.01, 0.0},
                             {0.98, 0.0, 0.02},
                             {0.0, 0.98, 0.02},
                             {0.02, 0.98, 0.0},
@@ -443,7 +443,7 @@ State sampleState(){
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::uniform_real_distribution<> dis_x(0, +X_MAX);
-    static std::uniform_real_distribution<> dis_y(-10, +Y_MAX);
+    static std::uniform_real_distribution<> dis_y(-5, +Y_MAX);
     //static std::uniform_real_distribution<> dis_y(-50, +25);
     State s;
     s.x = dis_x(gen);
@@ -458,7 +458,7 @@ State steer(const State&s_from, const State&s_to){
     double direction = atan2(s_to.y - s_from.y, s_to.x - s_from.x);
     State new_state;
     double dist = stateDistance(s_from, s_to);
-    double eta = 0.5;
+    double eta = 1.0;
     if (dist <= eta) {
         new_state = s_to;
     } else {
@@ -538,7 +538,7 @@ void MORRFplanner::run(int max_iterations){
 
         //std::cout << "------ Iteration " << i << " | Sampled State: (" << x_rand.x << ", " << x_rand.y << ")" << std::endl;
         //double search_radius = 30.0 * std::sqrt((std::log(G_nodes.size() + 1.0) / (G_nodes.size() + 1.0)));
-        double search_radius = 0.5;
+        double search_radius = 1.0;
         std::shared_ptr<Node> NstNode = getNearestNode(x_rand,search_radius);
         //std::cout<<"NstNode ID: " << NstNode->id << std::endl;
         
@@ -803,7 +803,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
         // std::cout << "Previous Intermediate State: " << previous_intermediate_risk.x << ", " << previous_intermediate_risk.y << std::endl;
         // std::cout << "CenterOfSegment: " << CenterOfSegment.x << ", " << CenterOfSegment.y << std::endl;
         // std::cout << "distance between segment: " << stateDistance(intermediate_State_risk, previous_intermediate_risk) << std::endl;
-        inverse_risk_segment = (stateDistance(CenterOfSegment, State{11.0,13.0}) - radius) * (stateDistance(CenterOfSegment, State{11.0,13.0}) - radius) ;
+        inverse_risk_segment = 1/((stateDistance(CenterOfSegment, State{11.0,13.0}) - radius) * (stateDistance(CenterOfSegment, State{11.0,13.0}) - radius)) ;
         if (inverse_risk_segment < 0.0){
             inverse_risk_segment = 0.001;
         }
@@ -815,7 +815,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
     }
     //risk = std::min(R,1.0 /sum_segment_risk)
     //dist /= num_steps; 
-    risk = 10. * (1.0/sum_segment_risk) * stateDistance(s_from,s_to)/num_steps;
+    risk = 1. * (sum_segment_risk) * stateDistance(s_from,s_to)/num_steps;
     cost[1] = risk;
     if (risk < 0.0) {
         std::cout << "Risk" << risk << std::endl;
@@ -857,7 +857,7 @@ int main(){
     int num_objectives = 3;
     int divisions = 6;
     double threshold = 0.25;
-    int iterations = 80000;
+    int iterations = 40000;
     MORRFplanner planner(start, goal, threshold, num_objectives, divisions);
     // 3. running the planner
     std::cout << "Starting MORRF* planning with Kinematic point mass..." << std::endl;
