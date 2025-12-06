@@ -120,56 +120,56 @@ class MORRFplanner{
         }
 
         // Lambda : uniform distributions
-        // lambdas.clear();
-        // for (int i = 0; i <= num_divs; ++i) {
-        //     for (int j = 0; j <= num_divs - i; ++j) {
-        //         int k = num_divs - i - j; 
-
-        //         std::vector<double> vec(3);
-        //         vec[0] = (double)i / num_divs;
-        //         vec[1] = (double)j / num_divs;
-        //         vec[2] = (double)k / num_divs;
-
-        //         lambdas.push_back(vec);
-        //     }
-        // }
         lambdas.clear();
-        std::vector<std::vector<double>>Test_Lambda_Set = 
-                            {{0.0, 0.0, 1.0},
-                            {0.0, 1.0, 0.0},
-                            {1.0, 0.0, 0.0},
-                            {0.99, 0.0, 0.01},
-                            {0.0, 0.99, 0.01},
-                            {0.01, 0.99, 0.0},
-                            {0.01, 0.0, 0.99},
-                            {0.0, 0.01, 0.99},
-                            {0.99, 0.01, 0.0},
-                            {0.98, 0.0, 0.02},
-                            {0.0, 0.98, 0.02},
-                            {0.02, 0.98, 0.0},
-                            {0.02, 0.0, 0.98},
-                            {0.0, 0.02, 0.98},
-                            {0.98, 0.02, 0.0},
-                            {0.97, 0.0, 0.03},
-                            {0.0, 0.97, 0.03},
-                            {0.03, 0.97, 0.0},
-                            {0.03, 0.0, 0.97},
-                            {0.0, 0.03, 0.97},
-                            {0.97, 0.03, 0.0},
-                            {0.9, 0.05, 0.05},
-                            {0.05, 0.9, 0.05},
-                            {0.05, 0.9, 0.05},
-                            {0.05, 0.05, 0.9},
-                            {0.05, 0.05, 0.9},
-                            {0.9, 0.05, 0.05},
-                            {1/3, 1/3, 1/3}};
-        lambdas = Test_Lambda_Set;
+        for (int i = 0; i <= num_divs; ++i) {
+            for (int j = 0; j <= num_divs - i; ++j) {
+                int k = num_divs - i - j; 
+
+                std::vector<double> vec(3);
+                vec[0] = (double)i / num_divs;
+                vec[1] = (double)j / num_divs;
+                vec[2] = (double)k / num_divs;
+
+                lambdas.push_back(vec);
+            }
+        }
+        // lambdas.clear();
+        // std::vector<std::vector<double>>Test_Lambda_Set = 
+        //                     {{0.0, 0.0, 1.0},
+        //                     {0.0, 1.0, 0.0},
+        //                     {1.0, 0.0, 0.0},
+        //                     {0.99, 0.0, 0.01},
+        //                     {0.0, 0.99, 0.01},
+        //                     {0.01, 0.99, 0.0},
+        //                     {0.01, 0.0, 0.99},
+        //                     {0.0, 0.01, 0.99},
+        //                     {0.99, 0.01, 0.0},
+        //                     {0.98, 0.0, 0.02},
+        //                     {0.0, 0.98, 0.02},
+        //                     {0.02, 0.98, 0.0},
+        //                     {0.02, 0.0, 0.98},
+        //                     {0.0, 0.02, 0.98},
+        //                     {0.98, 0.02, 0.0},
+        //                     {0.97, 0.0, 0.03},
+        //                     {0.0, 0.97, 0.03},
+        //                     {0.03, 0.97, 0.0},
+        //                     {0.03, 0.0, 0.97},
+        //                     {0.0, 0.03, 0.97},
+        //                     {0.97, 0.03, 0.0},
+        //                     {0.9, 0.05, 0.05},
+        //                     {0.05, 0.9, 0.05},
+        //                     {0.05, 0.9, 0.05},
+        //                     {0.05, 0.05, 0.9},
+        //                     {0.05, 0.05, 0.9},
+        //                     {0.9, 0.05, 0.05},
+        //                     {1/3, 1/3, 1/3}};
+        // lambdas = Test_Lambda_Set;
         std::cout << "The number of lambdas generated: " << lambdas.size() << std::endl;
         int num_sub = lambdas.size();
-        // num_sub = (num_divs + 2) * (num_divs + 1) /2;
-        // if (num_objectives == 3 && num_sub != lambdas.size()){
-        //     throw std::runtime_error("Error in generating lambdas for 3 objectives.");
-        // };
+        num_sub = (num_divs + 2) * (num_divs + 1) /2;
+        if (num_objectives == 3 && num_sub != lambdas.size()){
+            throw std::runtime_error("Error in generating lambdas for 3 objectives.");
+        };
         //Subproblem trees Initialization
         subproblem_trees.resize(num_sub);
         for (size_t k = 0; k < num_sub; ++k){
@@ -855,9 +855,9 @@ int main(){
     State start = {1.0, 15.0};
     State goal = {21.0,15.0};
     int num_objectives = 3;
-    int divisions = 6;
+    int divisions = 30;
     double threshold = 0.25;
-    int iterations = 40000;
+    int iterations = 100000;
     MORRFplanner planner(start, goal, threshold, num_objectives, divisions);
     // 3. running the planner
     std::cout << "Starting MORRF* planning with Kinematic point mass..." << std::endl;
