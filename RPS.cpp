@@ -1,54 +1,67 @@
 /*
- * MRPS Hybrid Implementation
- * 1. Regret LP Solver: Gurobi Optimizer
- * 2. Robot Planner: OMPL (RRT*)
+ * Regret-Based Pareto Front Sampling (C++ Implementation)
+ * Integrated with Custom Cost Function (Distance, Risk, Time)
+ *
+ * Dependencies: OMPL, Gurobi C++, Boost
+ *
+ * Compilation Command:
+ * g++ -m64 -g RPS.cpp -o RPS \
+ * -I/opt/gurobi1300/linux64/include \
+ * -L/opt/gurobi1300/linux64/lib \
+ * -I/home/seung/ompl/src \
+ * -L/home/seung/ompl/build/lib \
+ * -I/usr/include/eigen3 \
+ * -lgurobi_c++ -lgurobi130 -lompl -lpthread
  */
 
 #include <iostream>
 #include <vector>
-#include <cmath>
-#include <numeric>
 #include <algorithm>
-#include <iomanip>
-#include <queue>
+#include <cmath>
 #include <memory>
+#include <numeric>
+#include <limits>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <iomanip>
 
-// --- Gurobi Header ---
+// Gurobi
 #include "gurobi_c++.h"
 
-// --- OMPL Headers ---
+// OMPL Core
 #include <ompl/base/SpaceInformation.h>
-#include <ompl/base/spaces/SE2StateSpace.h>
+#include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/geometric/SimpleSetup.h>
-#include <ompl/geometric/planners/rrt/RRTstar.h>
-#include <ompl/base/objectives/PathLengthOptimizationObjective.h>
-#include <ompl/base/objectives/StateCostIntegralObjective.h>
-#include <ompl/base/objectives/OptimizationObjective.h>
+#include <ompl/base/OptimizationObjective.h>
 
-using namespace std;
+// OMPL Planners
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
-// ---------------------------------------------------------
-// 1. Basic Structures
-// ---------------------------------------------------------
+// ==========================================
+// 1. Data Structures & Cost Helpers
+// ==========================================
 
 using Vector = std::vector<double>;
 
+// User-defined State struct for cost calculation
+struct State {
+    double x;
+    double y;
+};
 
-double dot(const Vector& a, const Vector& b) {
-    double sum = 0.0;
-    for (size_t i = 0; i < a.size(); ++i) {
-        sum += a[i] * b[i];
-    };
-    return sum;
+// Helper: Euclidean Distance
+double getEuclideanDist(const State& s1, const State& s2) {
+    return std::sqrt(std::pow(s1.x - s2.x, 2) + std::pow(s1.y - s2.y, 2));
 }
 
-double getEuclideanDist(const StateXY& a, const StateXY& b) {
-    return std::sqrt(std::pow(a.x - b.x, 2) + std::pow(a.y - b.y, 2));
-}
+// Cost Function for a segment between s_from and s_to. 
+// Returns vector: [Travel Distance, Risk, Travel Time]
 
-std::vector<double> calculateSegmentCost(const StateXY& s_from, const StateXY& s_to) {
+std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to) {
     std::vector<double> cost(3, 0.0);
 
     // 1. Cost[0]: Distance
@@ -58,16 +71,16 @@ std::vector<double> calculateSegmentCost(const StateXY& s_from, const StateXY& s
     const double obstacle_cx = 11.0;
     const double obstacle_cy = 13.0;
     const double radius = 3.0;
-    StateXY obstacle = {obstacle_cx, obstacle_cy};
+    State obstacle = {obstacle_cx, obstacle_cy};
 
     double risk = 0.0;
     int num_steps = 16;
     
     double sum_segment_risk = 0.0; 
     
-    StateXY previous_intermediate_risk = s_from;
-    StateXY intermediate_State_risk;
-    StateXY CenterOfSegment;
+    State previous_intermediate_risk = s_from;
+    State intermediate_State_risk;
+    State CenterOfSegment;
 
     for (int i = 1; i <= num_steps; ++i) {
         double ratio = (double)i / num_steps;
@@ -82,27 +95,24 @@ std::vector<double> calculateSegmentCost(const StateXY& s_from, const StateXY& s
 
         // (Distance - Radius)^2
         double dist_to_obs = getEuclideanDist(CenterOfSegment, obstacle);
-        double inverse_risk_segment = (dist_to_obs - radius) * (dist_to_obs - radius);
+        double inverse_risk_segment = 1.0 / ((dist_to_obs - radius) * (dist_to_obs - radius) + 1e-3);
         
-        if (inverse_risk_segment < 0.0) { /
-            inverse_risk_segment = 0.001;
+        if (inverse_risk_segment < 0.0){
+                    inverse_risk_segment = 0.001;
         }
-        if (inverse_risk_segment < 0.001) inverse_risk_segment = 0.001;
 
         previous_intermediate_risk = intermediate_State_risk;
         sum_segment_risk += inverse_risk_segment;
     }
 
     // Risk Formula
-    // 10 * (1/sum) * length / steps
-    if (sum_segment_risk < 1e-9) sum_segment_risk = 1e-9;
-    risk = 1.0 * (1.0 / sum_segment_risk) * cost[0] / num_steps;
+    risk = 1.0 * (sum_segment_risk) * cost[0] / num_steps;
     cost[1] = risk;
 
     // 3. Cost[2]: Travel Time
-    StateXY previous_intermediate_traveltime = s_from;
-    StateXY intermediate_traveltime;
-    double Time = 0.0; // 초기화 필수
+    State previous_intermediate_traveltime = s_from;
+    State intermediate_traveltime;
+    double Time = 0.0;
 
     for (int i = 1; i <= num_steps; ++i) {
         double ratio = (double)i / num_steps;
@@ -110,6 +120,7 @@ std::vector<double> calculateSegmentCost(const StateXY& s_from, const StateXY& s
         intermediate_traveltime.y = s_from.y + ratio * (s_to.y - s_from.y);
         
         double speed;
+        // Logic: Lower Y is fast (Highway), Higher Y is slow
         if (intermediate_traveltime.y < 13.0) {
             speed = 100.0; // Highway
         } else {
@@ -124,306 +135,436 @@ std::vector<double> calculateSegmentCost(const StateXY& s_from, const StateXY& s
 
     return cost;
 }
-void printVec(const Vector& v) {
-    std::cout << "[";
-    for (size_t i = 0; i < v.size(); ++i) {
-        std::cout << (i > 0 ? ", " : "") << std::fixed << std::setprecision(4) << v[i];
-    };
-    std::cout << "]";
-}
-struct PlannerSolution {
-    Vector objectives; // [Cost1, Cost2,...]
-};
-struct Sample{
-    Vector weights; // Weight vector
-    PlannerSolution s; // Robot trajectory/Cost
-    double u_val;// Optimal scalar cost = w * f(s)
-};
-struct StateXY {
-    double x, y;
-};
 
+// Represents a sample in our database: {weight, cost_vector}
+struct SampledCost {
+    int id; // ID in the database
+    Vector w; // Weight Vector
+    Vector f; // Cost Vector f(s) = [Dist, Risk, Time]
+};
 struct Neighborhood{
-    std::vector<int> vertex_indices;
+    // distance, risk, time
+    int id_d,id_r, id_t; // Indices of the corners in the database
+    double max_regret; // the worst case regret found in this traiangle
+    Vector candidate_w; // The weight that causes this max regret -> pivot. 
+};
+
+// This is the result of the LP solver.
+struct RegretResult {
     double max_regret;
-    Vector w_candidate;
-    bool operator<(const Neighborhood& other) const {
-        return max_regret < other.max_regret;
-    }
-};
-struct Sample {
-    Vector weights;
-    PlannerSolution s;
-    double u_val;
+    Vector worst_w;
 };
 
-// Neighborhood (Simplex)
-struct Neighborhood {
-    std::vector<int> vertex_indices;
-    double max_regret;
-    Vector w_candidate;
+void printVector(const std::string& label, const Vector& v) {
+    std::cout << label << ": [ ";
+    for (auto d : v) std::cout << d << " ";
+    std::cout << "]" << std::endl;
+}
+std::ofstream logFile;
+// ==========================================
+// 2. OMPL Planner Setup
+// ==========================================
 
-    bool operator<(const Neighborhood& other) const {
-        return max_regret < other.max_regret;
-    }
-};
-class RobotPlanner {
-public:
-    virtual PlannerSolution solve(const Vector& weights) = 0;
-    virtual int getNumObjectives() const = 0;
-    virtual ~RobotPlanner() = default;
-};
-
-// ---------------------------------------------------------
-// 2. Gurobi Regret Solver (LP Solver)
-// ---------------------------------------------------------
-// MRPS 알고리즘 내부의 Regret Maximization 문제를 Gurobi로 해결
-class RegretMaximizationLP{
-    GRBEnv& env;
-public:
-    RegretMaximizationLP(GRBEnv& env_ref) : env(env_ref) {}
-    // Solve : Maximize c^T x s.t. Ax <= b, x >= 0
-    bool solve(Neighborhood& N, const std::vector<const Sample*>& vertices){
-        GRBModel model(env);
-        model.set(GRB_IntParam_OutputFlag,0);
-        int n = vertices.size();
-        int n_objs = vertices[0]->weights.size();
-
-        std::vector<GRBVar> alpha(n);
-        for (int i = 0; i < num_vars; ++i){
-            alpha[i] = model.addVar(0.0, GRB_infinity, 0.0, GRB_continous,"alpha_"+std::to_string(i));
-        }
-        // eta : Linear approximation of upper bound
-        GRBVar eta = model.addVar(-GRB_INFINITY, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "eta");
-        model.update();
-        // --- 2. Objective (Equation 12).
-        // maximize x - P(w) 
-        // maximize eta - sum(alpha_i * u_i)
-        GRBLinExpr lower_bound_approx = 0.0;
-
-        for (int i = 0; i < num_vars; ++i){
-            lower_bound_approx += vertices[i]->u_val * alpha[i];
-        }
-        model.setObjective(eta - lower_bound_approx, GRB_MAXIMIZE);
-        // --- 3. Constraints
-        GRBLinExpr sum_alpha = 0.0;
-        for (int i = 0; i < num_vars; ++i){
-            sum_alpha += alpha[i];
-        }
-        model.addConstr(sum_alpha == 1.0, "SumAlpha");
-        // Upper Bound Constriants, A * X >= 0.
-        for (int k = 0;k < n ; ++k){
-            Vector f_s_k = vertices[k]->s.objectives;
-            GRBLinExpr w_dot_fsk = 0.0;
-            for (int j = 0; j < n ; ++j){
-                double val = dot(vertices[j]->weights, f_s_k);
-                w_dot_fsk += val * alpha[j];
-            }
-            model.addConstr(eta <= w_dot_fsk, "UpperBound_"+std::to_string(k));
-        }
-        model.optimize();
-        if (model.get(GRB_IntAttr_Status) == GRB_OPTIMAL){
-             N.max_regret= model.get(GRB_DoubleAttr_ObjVal);
-            if (N.max_regret < 0.0){
-                N.max_regret = 0.0;
-                std::cout<< "Max Regret is negative, set to zero." << std::endl;
-            }
-            int dim = vertices[0]->weights.size();
-            N.w_candidate.assign(dim,0.0);
-            for (int i = 0; i < n; ++i){
-                double alpha_val = alpha[i].get(GRB_DoubleAttr_X);
-                for (int d = 0; d < dim; ++d){
-                    N.w_candidate[d] += alpha_val * vertices[i]->weights[d];
-                };
-            };
-            return true;
-        }else{
-            return false;
-        }
-    }
-};
-/*
-OMPL Planner Implementation
-*/
-// 사용자 정의 Cost Objective (Weighted Sum of 3 Objectives)
 class CustomWeightedObjective : public ob::OptimizationObjective {
-    Vector weights; // [w_dist, w_risk, w_time]
-
 public:
-    CustomWeightedObjective(const ob::SpaceInformationPtr& si, const Vector& w) 
-        : ob::OptimizationObjective(si), weights(w) {
-        // 비용 합산 방식: 누적 (Path Cost = Sum of segment costs)
-        setCostThreshold(ob::Cost(std::numeric_limits<double>::infinity()));
+    CustomWeightedObjective(const ob::SpaceInformationPtr &si, const Vector& weights)
+        : ob::OptimizationObjective(si), weights(weights) {
+        description_ = "Weighted Distance/Risk/Time";
     }
 
-    // Motion Cost: 두 상태 사이의 비용 계산
-    ob::Cost motionCost(const ob::State* s1, const ob::State* s2) const override {
-        const auto* start = s1->as<ob::SE2StateSpace::StateType>();
-        const auto* end = s2->as<ob::SE2StateSpace::StateType>();
-
-        StateXY p1 = {start->getX(), start->getY()};
-        StateXY p2 = {end->getX(), end->getY()};
-
-        // 사용자 로직 호출
-        Vector costs = calculateSegmentCost(p1, p2);
-
-        // 스칼라화: w * c
-        double weighted_cost = 0.0;
-        for(size_t i=0; i<3; ++i) {
-            weighted_cost += weights[i] * costs[i];
-        }
-
-        return ob::Cost(weighted_cost);
-    }
-
-    // State Cost는 0 (Motion Cost에 모두 포함됨)
-    ob::Cost stateCost(const ob::State* s) const override {
+    ob::Cost stateCost(const ob::State *s) const override {
         return ob::Cost(0.0);
     }
+
+    ob::Cost motionCost(const ob::State *s1, const ob::State *s2) const override {
+        // ""Take this generic state s1, and let mee use it "AS" a RealVectorStateSpace         
+        // ::StateType
+        const auto* p1 = s1->as<ob::RealVectorStateSpace::StateType>();
+        const auto* p2 = s2->as<ob::RealVectorStateSpace::StateType>();
+
+        State st1 = {p1->values[0], p1->values[1]};
+        State st2 = {p2->values[0], p2->values[1]};
+
+        // 2. Calculate the multi objectives vector
+        std::vector<double> obj_costs = calculateSegmentCost(st1, st2);
+
+        // 3. Weight them: w0*Dist + w1*Risk + w2*Time
+        double scalar_cost = 0.0;
+        for(size_t i = 0; i< weights.size() && i < obj_costs.size(); ++i){
+            scalar_cost += weights[i] * obj_costs[i];
+        }
+        return ob::Cost(scalar_cost);
+    }
+
+private:
+    Vector weights;
+};
+
+// Evaluate the full path to get the [Dist, Risk, Time] vector
+Vector evaluatePathCosts(og::PathGeometric& path) {
+    Vector total_costs(3, 0.0);
+    const auto& states = path.getStates();
+
+    for (size_t i = 0; i < states.size() - 1; ++i) {
+        const auto* p1 = states[i]->as<ob::RealVectorStateSpace::StateType>();
+        const auto* p2 = states[i+1]->as<ob::RealVectorStateSpace::StateType>();
+        
+        State st1 = {p1->values[0], p1->values[1]};
+        State st2 = {p2->values[0], p2->values[1]};
+
+        std::vector<double> segment_costs = calculateSegmentCost(st1, st2);
+
+        for(int k=0; k<3; ++k) total_costs[k] += segment_costs[k];
+    }
+    return total_costs;
+}
+// Using OMPL Solver. Inputs : weight, and setup. Outputs: Cost Vector. 
+Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
+    // 1. 목표 함수 설정
+    auto obj = std::make_shared<CustomWeightedObjective>(setup.getSpaceInformation(), w);
+    setup.setOptimizationObjective(obj);
+    setup.clear();
+
+    // --- Method 3: Iterative Improvement (Correct Logic) ---
     
-    // 비용 결합 방식: 덧셈
-    ob::Cost combineCosts(ob::Cost c1, ob::Cost c2) const override {
-        return ob::Cost(c1.value() + c2.value());
+    double prev_cost = std::numeric_limits<double>::infinity();
+    double current_cost = std::numeric_limits<double>::infinity();
+    
+    // 설정값
+    double time_slice = 1.0;            // 1초 단위로 끊어서 실행
+    double improvement_threshold = 0.001; // 0.1% 미만으로 좋아지면 "수렴"으로 판단
+    int max_batches = 20;               // 최대 20번(20초)까지만 시도
+    int batch_count = 0;
+
+    // 첫 실행 (무조건 1회 실행)
+    setup.solve(time_slice);
+    if (setup.haveExactSolutionPath()) {
+        current_cost = setup.getSolutionPath().cost(obj).value();
     }
-};
+    batch_count++;
 
-// Validity Checker (장애물과 경계)
-class MyValidityChecker : public ob::StateValidityChecker {
-public:
-    MyValidityChecker(const ob::SpaceInformationPtr& si) : ob::StateValidityChecker(si) {}
-    bool isValid(const ob::State* state) const override {
-        const auto* se2state = state->as<ob::SE2StateSpace::StateType>();
-        double x = se2state->getX();
-        double y = se2state->getY();
-        
-        // Map Bounds (0~20) - OMPL bounds 설정과 일치해야 함
-        if (x < 0 || x > 25 || y < 0 || y > 25) return false;
-
-        // 원형 장애물 (11, 13, r=3) 내부만 아니면 됨
-        // (Risk Cost는 경계 근처에서 높아지지만, Validity는 충돌 여부만 판단)
-        // 충돌 여부를 Risk 계산과 분리해도 되고, Risk가 무한대인 곳을 Invalid로 봐도 됨.
-        // 여기서는 물리적 충돌(반경 2.5 이내)만 Invalid로 처리하고, 
-        // 3.0 반경 근처는 높은 Cost로 처리하겠습니다.
-        double dist_sq = pow(x - 11.0, 2) + pow(y - 13.0, 2);
-        return dist_sq >= (3.0 * 3.0); 
-    }
-};
-
-class OMPLRobotPlanner : public RobotPlanner {
-    ob::StateSpacePtr space;
-    ob::SpaceInformationPtr si;
-    og::SimpleSetupPtr ss;
-
-public:
-    OMPLRobotPlanner() {
-        space = std::make_shared<ob::SE2StateSpace>();
-        // 사용자 좌표계가 (11,13)을 포함하므로 0~20으로 확장
-        ob::RealVectorBounds bounds(2);
-        bounds.setLow(0.0);
-        bounds.setHigh(25.0); 
-        space->as<ob::SE2StateSpace>()->setBounds(bounds);
-
-        si = std::make_shared<ob::SpaceInformation>(space);
-        si->setStateValidityChecker(std::make_shared<MyValidityChecker>(si));
-        si->setup();
-
-        ss = std::make_shared<og::SimpleSetup>(si);
-        auto planner = std::make_shared<og::RRTstar>(si);
-        planner->setRange(0.5); // Step size
-        ss->setPlanner(planner);
-    }
-
-    int getNumObjectives() const override { return 3; } // 3개로 변경됨
-
-    PlannerSolution solve(const Vector& weights) override {
-        ss->clear();
-        
-        // Start & Goal (맵 크기에 맞춰 조정)
-        ob::ScopedState<ob::SE2StateSpace> start(space);
-        start->setX(1.0); start->setY(15.0); start->setYaw(0.0);
-        
-        ob::ScopedState<ob::SE2StateSpace> goal(space);
-        goal->setX(21.0); goal->setY(15.0); goal->setYaw(0.0);
-        
-        ss->setStartAndGoalStates(start, goal);
-
-        // 1. 가중치가 적용된 Objective 설정
-        auto combinedObj = std::make_shared<CustomWeightedObjective>(si, weights);
-        ss->setOptimizationObjective(combinedObj);
-        ss->setup();
-
-        // 2. Solve (Time budget 1.0s)
-        ob::PlannerStatus solved = ss->solve(1.0);
-
-        PlannerSolution sol;
-        sol.objectives = std::vector<double>(3, 0.0);
-
-        if (solved) {
-            ss->simplifySolution();
-            auto path = ss->getSolutionPath();
-            const auto& states = path.getStates();
-
-            // 3. 최적 경로에 대해 [Dist, Risk, Time] 각각 재계산
-            for (size_t i = 0; i < states.size() - 1; ++i) {
-                const auto* s1 = states[i]->as<ob::SE2StateSpace::StateType>();
-                const auto* s2 = states[i+1]->as<ob::SE2StateSpace::StateType>();
-                
-                StateXY p1 = {s1->getX(), s1->getY()};
-                StateXY p2 = {s2->getX(), s2->getY()};
-
-                Vector segment_costs = calculateSegmentCost(p1, p2);
-                
-                // 누적
-                for(int k=0; k<3; ++k) {
-                    sol.objectives[k] += segment_costs[k];
-                }
+    // 반복 루프: "비용이 유의미하게 줄어드는 동안" 계속 실행
+    while (batch_count < max_batches) {
+        // 해를 못 찾았으면 계속 찾기
+        if (current_cost == std::numeric_limits<double>::infinity()) {
+            setup.solve(time_slice);
+            if (setup.haveExactSolutionPath()) {
+                current_cost = setup.getSolutionPath().cost(obj).value();
             }
-        } else {
-            // 실패 시 페널티
-            sol.objectives = {1e5, 1e5, 1e5};
-        }
-        return sol;
-    }
-};
+        } 
+        // 해를 찾았다면, 비용 개선 확인
+        else {
+            prev_cost = current_cost;
+            
+            // 기존 트리를 이어서 더 탐색 (RRT*는 시간이 지날수록 최적화됨)
+            setup.solve(time_slice);
 
-/*
-MRPS Algorithm Implementation
-*/
-class RegretBasedSampler{
-    RobotPlanner& planner;
-    RegretMaximizationLP solver;
-    std::vector<Sample> samples;
-    std::priority_queue<Neighborhood> neighborhood_queue;
-    int n_objs;
-    public:
-    RegretBasedSampler(RobotPlanner& p, GRBEnv& env): planner(p), solver(env){
-        n_objs = planner.getNumObjectives();
+            double new_cost = setup.getSolutionPath().cost(obj).value();
+
+            double improvement = (prev_cost - new_cost) / prev_cost;
+
+            if (improvement < improvement_threshold) {
+                //std::cout << "Converged at batch " << batch_count << " (Imp: " << improvement << ")" << std::endl;
+                break; 
+            }
+            current_cost = new_cost;
+        }
+        batch_count++;
     }
-    const std::vector<Sample>& getSamples() const{
-        return samples;
+    return evaluatePathCosts(setup.getSolutionPath());
+    // if (setup.haveExactSolutionPath()) {
+    //     og::PathGeometric& path = setup.getSolutionPath();
+
+    //     // [중요] 경로 단순화 (Path Simplification)
+    //     // RRT*의 지그재그 경로를 펴서 Regret을 줄이는 핵심 단계
+    //     og::PathSimplifier simplifier(setup.getSpaceInformation());
+    //     simplifier.simplifyMax(path);
+    //     simplifier.smoothBSpline(path);
+
+    //     return evaluatePathCosts(path);
+    // } else {
+    //     // 끝까지 해를 못 찾은 경우
+    //     return {1e9, 1e9, 1e9}; 
+    // }
+}
+// ==========================================
+// 3. Gurobi LP Solver (Equation 12.) -> To find the max regret and its weight.
+// ==========================================
+// Solve the Max Regret LP given the current database of SampledCosts.
+// s.t. 
+// w is inside the convex hull of the corner weights
+// R <= Known solution cost at w 
+RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std::vector<double>& global_max_costs) {
+    int num_objectives = 3; // Must be 3 in out case. 
+    int k = corners.size(); // number of corners in the neighborhood
+   try {
+        GRBEnv env = GRBEnv(true);
+        env.set("LogFile", "gurobi.log");
+        env.start();
+        env.set(GRB_IntParam_OutputFlag, 0);
+        // Create am empty and initialized model. 
+        GRBModel model = GRBModel(env);
+        // Definition of variables.
+        std::vector<GRBVar> lambda(k);
+        for(int i=0; i<k; ++i) 
+            lambda[i] = model.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "lambda");
+
+        std::vector<GRBVar> w(num_objectives);
+        for(int j=0; j<num_objectives; ++j) 
+            w[j] = model.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "w");
+
+        GRBVar R = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "Regret");
+
+        // w definition : a linear combination of corner weights. 
+        for(int j=0; j<num_objectives; ++j) {
+            GRBLinExpr expr = 0;
+            for(int i=0; i<k; ++i) expr += lambda[i] * corners[i].w[j];
+            model.addConstr(w[j] == expr);
+        }
+
+        // Sum lambdas = 1
+        GRBLinExpr sum_lambdas = 0;
+        for(int i=0; i<k; ++i) sum_lambdas += lambda[i];
+        model.addConstr(sum_lambdas == 1.0);
+
+        // Lower Bound Calculation : P(w)
+        std::vector<double> u_corners(k);
+        for(int i=0; i<k; ++i) {
+            double dot = 0.0;
+            for(int j=0; j<num_objectives; ++j) dot += corners[i].w[j] * corners[i].f[j] / global_max_costs[j];
+            u_corners[i] = dot;
+        }
+
+        GRBLinExpr LB = 0;
+        for(int i=0; i<k; ++i) LB += lambda[i] * u_corners[i];
+
+        // Regret Constraints: R <= w*f(s^j)- P(w) for each corner j
+        for(int i=0; i<k; ++i) {
+            GRBLinExpr w_dot_fs = 0.0;
+            for(int j=0; j<num_objectives; ++j) w_dot_fs += w[j] * corners[i].f[j] / global_max_costs[j];
+            model.addConstr(R <= w_dot_fs - LB);
+        }
+
+        model.setObjective(GRBLinExpr(R), GRB_MAXIMIZE);
+        model.optimize();
+
+        Vector res_w;
+        for(int j=0; j<num_objectives; ++j) res_w.push_back(w[j].get(GRB_DoubleAttr_X));
+        return {R.get(GRB_DoubleAttr_X), res_w};
+
+    } catch(GRBException e) {
+        std::cerr << "Gurobi Error: " << e.getMessage() << std::endl;
+        return {-1.0, {}};
+    }
+}
+
+// ==========================================
+// 4. Neighborhood Helper
+// ==========================================
+
+// Note: For 3 objectives, valid neighborhoods are triangles (simplexes) in weight space.
+// Full implementation requires Delaunay Triangulation (e.g. via CGAL).
+// For this snippet, we simply return the simplex formed by the initial corners
+// to allow the first iteration of Regret calculation to proceed.
+std::vector<std::vector<int>> getNeighborhoods(const std::vector<SampledCost>& samples) {
+    std::vector<std::vector<int>> simplices;
+    
+    if (samples.size() == 3) {
+        // Initial state: Just one simplex (the whole space)
+        simplices.push_back({0, 1, 2});
+    } else {
+        // Fallback for >3 samples without CGAL:
+        // Return random triples or just the initial one to prevent crashing.
+        // In a real implementation, you must re-triangulate here.
+        simplices.push_back({0, 1, 2}); 
+    }
+    return simplices;
+}
+
+bool isStateValid(const ob::State *state) {
+    const auto *pos = state->as<ob::RealVectorStateSpace::StateType>();
+    double x = pos->values[0];
+    double y = pos->values[1];
+
+    // Define the Obstacle (Must match the one in calculateSegmentCost)
+    double obs_x = 11.0;
+    double obs_y = 13.0;
+    double radius = 3.0; 
+
+    double dist = std::sqrt(std::pow(x - obs_x, 2) + std::pow(y - obs_y, 2));
+
+    // Valid if distance is greater than radius
+    return dist > radius + 0.1; 
+}
+// 5. Main Loop
+
+int main() {
+    logFile.open("RPS_log.txt");
+    logFile << "Iteration, w1,w2,w3, f1,f2,f3, MaxRegret\n";
+    auto stateSpace = std::make_shared<ob::RealVectorStateSpace>(2);
+    stateSpace->setBounds(0.0, 30.0); 
+    og::SimpleSetup setup(stateSpace);
+    ob::ScopedState<> start(stateSpace);
+    setup.setStateValidityChecker(isStateValid);
+    start[0] = 1.0; start[1] = 21.0;
+        
+    ob::ScopedState<> goal(stateSpace);
+    goal[0] = 21.0; goal[1] = 21.0;
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.setPlanner(std::make_shared<og::RRTstar>(setup.getSpaceInformation()));
+
+    // 2. Initialize Algorithm
+    std::vector<SampledCost> database;
+    int num_obj = 3; // Distance, Risk, Time
+
+    // Standard Basis Weights (Corners of the 3-obj simplex)
+    std::vector<Vector> corner_weights = {
+        {1.0, 0.0, 0.0}, // Pure Distance
+        {0.0, 1.0, 0.0}, // Pure Risk
+        {0.0, 0.0, 1.0}  // Pure Time
     };
-    void evaluateNeighborhood(Neighborhood& N){
-        // Collect vertex points
-        std::vector<const Sample*> vertices;
-        for (int idx : N.vertex_indices){
-            vertices.push_back(&samples[idx]);
-        }
-        solver.solve(N,vertices);
-    }
-    void run(int K){
-        std::vector<int> indices;
-        for (int i =0; i < n_objs; ++i){
-            Vector w(n_objs,0.0);
-            w[i] = 1.0;
-            std::cout << "Init " << i << "-th Objective with weight: ";
-            PlannerSolution s = planner.solve(w);
-            double u = dot(w,s.objectives);
-            std::cout << "Cost: "; printVec(s.objectives); std::cout << endl;
-            samples.push_back(Sample{w,s,u});
-            indices.push_back(i);
+
+    std::cout << "--- Initializing Corners ---" << std::endl;
+
+    // 1. Initialize Global Max Tracker
+    // Start with 1.0 to avoid division by zero initially, or small epsilon
+    std::vector<double> global_max_costs(3, 1.0); 
+    for (int i = 0; i < 3 ; ++i) {
+        Vector f = solvePlanningProblem(corner_weights[i], setup);
+        database.push_back({i, corner_weights[i], f});
+
+        // UPDATE GLOBAL MAX
+        for(int k=0; k<3; ++k) {
+            if(f[k] > global_max_costs[k]) global_max_costs[k] = f[k];
         }
     }
+    std::cout << "Global Max Costs after initialization: "
+              << global_max_costs[0] << ", "
+              << global_max_costs[1] << ", "
+              << global_max_costs[2] << std::endl;
+    std::list<Neighborhood> neighborhoods;
+    // Create the FIRST neighborhood (the whole triangle, 0 - 1 - 2)
+    Neighborhood initial_neighborhood;
+    initial_neighborhood.id_d = 0;
+    initial_neighborhood.id_r = 1;
+    initial_neighborhood.id_t = 2;
+    std::vector<SampledCost> initial_corners = {
+        database[initial_neighborhood.id_d],
+        database[initial_neighborhood.id_r],
+        database[initial_neighborhood.id_t]
+    };
+    RegretResult initial_regret = solveMaxRegretLP(initial_corners,global_max_costs);
+    initial_neighborhood.max_regret = initial_regret.max_regret;
+    initial_neighborhood.candidate_w = initial_regret.worst_w;
+    neighborhoods.push_back(initial_neighborhood);
+    std::cout << "Initial Max Regret: " << initial_neighborhood.max_regret << std::endl;
 
+    //----- LOOP -----
+    int MAX_ITER = 40; 
+    
+    for(int k=0; k<MAX_ITER; ++k) {
+        std::cout << "\n--- Iteration " << k << " ---" << std::endl;
 
+        auto best_it = neighborhoods.begin();
+        double max_global_regret = -1.0;
+        for(auto it = neighborhoods.begin(); it != neighborhoods.end(); ++it) {
+            if(it->max_regret > max_global_regret) {
+                max_global_regret = it->max_regret;
+                best_it = it;
+            }
+        }
+        std::cout << "Selected Neighborhood with Max Regret: " << max_global_regret << std::endl;
+        std::cout << "Iteration " << k << ": Solving for weights " << max_global_regret << " Triangle Corners IDs: "
+                  << best_it->id_d << ", " << best_it->id_r << ", " << best_it->id_t << std::endl;
+        
+        if(max_global_regret < 0.005) {
+            std::cout << "Converged." << std::endl;
+            break;
+        }
+        // plan for the candidate weight
+        Vector new_w = best_it->candidate_w; // Pivot weight
+        Vector new_f = solvePlanningProblem(new_w, setup);
+        int new_id = database.size();
+        // 1. CHECK FOR DUPLICATES
+        bool is_duplicate = false;
+        int duplicate_id = -1;
 
-};
+        for(size_t i=0; i<database.size(); ++i) {
+            double dist = 0.0;
+            // Calculate Euclidean distance in Cost Space
+            for(int j=0; j<3; ++j) dist += std::pow(new_f[j] - database[i].f[j], 2);
+            
+            // Tolerance: If cost vector is within 0.1 of an existing one, it's a duplicate.
+            if(std::sqrt(dist) < 0.1) { 
+                is_duplicate = true;
+                duplicate_id = i;
+                continue;
+            }
+        }
+
+        // 2. HANDLE THE RESULT
+        if (is_duplicate) {
+            std::cout << "Duplicate detected! (Identical to ID " << duplicate_id << ")" << std::endl;
+            
+            // CRITICAL: Do NOT add to database. Do NOT subdivide.
+            // Simply remove the current neighborhood from the priority queue.
+            // This tells the algorithm: "There is nothing more to find in this specific direction."
+            neighborhoods.erase(best_it);
+            
+            // Continue to next iteration to pick the NEXT best neighborhood
+            continue; 
+        }
+        database.push_back({new_id, new_w, new_f});
+        printVector("New weight", new_w);
+        printVector("New cost", new_f);
+        logFile << k << "," << new_w[0] << "," << new_w[1] << "," << new_w[2] << ", "
+                << new_f[0] << "," << new_f[1] << "," << new_f[2] << ", "
+                << max_global_regret << "\n";
+        logFile.flush();
+        int d = best_it->id_d;
+        int r = best_it->id_r;
+        int t = best_it->id_t;
+        // Remove the used neighborhood
+        neighborhoods.erase(best_it);
+
+        int sets[3][3] = {
+            {d, r, new_id},
+            {d, new_id, t},
+            {new_id, r, t}
+        };
+        
+        // Create 3 new neighborhoods
+        for(int i=0; i<3; ++i) {
+            Neighborhood n;
+            n.id_d = sets[i][0];
+            n.id_r = sets[i][1];
+            n.id_t = sets[i][2];
+            std::vector<SampledCost> corners = {
+                database[n.id_d],
+                database[n.id_r],
+                database[n.id_t]
+            };
+            RegretResult regret = solveMaxRegretLP(corners,global_max_costs);
+            n.max_regret = regret.max_regret;
+            n.candidate_w = regret.worst_w;
+            neighborhoods.push_back(n);
+            std::cout << "New Neighborhood Corners IDs: "
+                      << n.id_d << ", " << n.id_r << ", " << n.id_t 
+                      << " with Max Regret: " << n.max_regret << std::endl;
+        }
+    }
+    std::cout << "Final Database:" << std::endl;
+    for(auto s : database) {
+        std::cout << "ID: " << s.id << " W: [ ";
+        for(auto w : s.w) std::cout << w << " ";
+        std::cout << "] F: [ ";
+        for(auto f : s.f) std::cout << f << " ";
+        std::cout << "]" << std::endl;
+    }
+    
+    logFile.close();
+    std::cout << "RPS Completed." << std::endl;
+    return 0;
+
+    }

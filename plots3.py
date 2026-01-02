@@ -100,11 +100,12 @@ def find_pareto_front(df):
 #results_filename = 'results_sub_66_iterations_8000.csv'
 #results_filename = 'results_sub_231_iterations_10000.csv'
 #results_filename = 'results_sub_21_iterations_6000.csv'
-results_filename = 'results.csv'
+#results_filename = 'results.csv'
 #results_filename = 'results_sub_496_iterations_20000.csv'
 #results_filename = 'results_sub_496_iterations_20000_finer.csv'
 #results_filename = 'results_nonzero_iterations_80000.csv'
 #results_filename = 'results_sub_496_iterations'
+results_filename = 'results_sub_496_iterations_100000.csv'
 df = parse_raw_data(results_filename)
 
 if df.empty:
@@ -405,23 +406,6 @@ for ax_sub, (x_col, y_col, title) in zip(axes, plot_configs):
 df = parse_raw_data(results_filename)
 df['ID'] = range(len(df))
 df = find_pareto_front(df)
-compare_cost_vectors(
-    df,          # baseline
-    # weight_list=[
-    #     [0.00, 0.00, 1.00],
-    #     [0.00, 0.01, 0.99],
-    #     [0.00, 0.02, 0.98],
-    #     [0.00, 0.03, 0.97],             
-    # ]
-    # weight_list = [[0.00,1.00,0.00],
-    #                [0.01,0.99,0.00],
-    #                [0.02,0.98,0.00],
-    #                [0.03,0.97,0.00]]
-    weight_list=[[1.00,0.00,0.00],
-                 [0.99,0.00,0.01],
-                 [0.98,0.00,0.02],
-                 [0.97,0.00,0.03]]
-)    
 
 # ---------------------------------------------------------
 ## ✨ Save Figures

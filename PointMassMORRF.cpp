@@ -855,9 +855,9 @@ int main(){
     State start = {1.0, 15.0};
     State goal = {21.0,15.0};
     int num_objectives = 3;
-    int divisions = 30;
+    int divisions = 10;
     double threshold = 0.25;
-    int iterations = 100000;
+    int iterations = 2000;
     MORRFplanner planner(start, goal, threshold, num_objectives, divisions);
     // 3. running the planner
     std::cout << "Starting MORRF* planning with Kinematic point mass..." << std::endl;
@@ -890,15 +890,3 @@ int main(){
     return 0;
 
 };
-
-/*
-0. Check the search radius and propagation radius -> done (both are 2.0)
-1. Refine the mathematical formulation
-2. Refine and check the cost 1 -> done 
-3. Make sure my trajectories very near-optimal. -> done.
-
-4. Order of new simcard
-5. Change the antenna.
-6. Ask Michael about the MURC experience. 
-
-*/
