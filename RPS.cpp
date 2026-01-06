@@ -434,7 +434,7 @@ int main() {
     initial_neighborhood.candidate_w = initial_regret.worst_w;
     neighborhoods.push_back(initial_neighborhood);
     std::cout << "Initial Max Regret: " << initial_neighborhood.max_regret << std::endl;
-
+    
     //----- LOOP -----
     int MAX_ITER = 100; 
     
