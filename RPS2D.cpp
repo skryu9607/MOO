@@ -5,7 +5,7 @@
  * Dependencies: OMPL, Gurobi C++, Boost
  *
  * Compilation Command:
- g++ -m64 -g RPS.cpp -o RPS \
+ g++ -m64 -g RPS2D.cpp -o RPS \
  -I/opt/gurobi1300/linux64/include \
  -L/opt/gurobi1300/linux64/lib \
  -I/home/seung/ompl/src \
@@ -63,7 +63,7 @@ double getEuclideanDist(const State& s1, const State& s2) {
 // Returns vector: [Travel Distance, Risk, Travel Time]
 
 std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to) {
-    std::vector<double> cost(3, 0.0);
+    std::vector<double> cost(2, 0.0);
 
     // 1. Cost[0]: Distance
     cost[0] = getEuclideanDist(s_from, s_to);
@@ -107,8 +107,8 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
     }
 
     // Risk Formula
-    risk = 1.0 * (sum_segment_risk) * cost[0] / num_steps;
-    cost[1] = risk;
+    risk = 1.0 * (sum_segment_risk) * getEuclideanDist(s_from, s_to) / num_steps;
+    //cost[1] = risk;
 
     // 3. Cost[2]: Travel Time
     State previous_intermediate_traveltime = s_from;
@@ -132,17 +132,17 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
         Time += distance_segment / speed;
         previous_intermediate_traveltime = intermediate_traveltime;
     }
-    cost[2] = Time;
+    cost[1] = Time;
 
     return cost;
 }
 
 std::vector<double> metricOfTrajectory(const std::vector<State>& trajectory) {
-    std::vector<double> total_costs(3, 0.0); // [Distance, Risk, Time]
+    std::vector<double> total_costs(2, 0.0); // [Distance, Risk, Time]
 
     for (size_t i = 0; i < trajectory.size() - 1; ++i) {
         std::vector<double> segment_costs = calculateSegmentCost(trajectory[i], trajectory[i + 1]);
-        for (int k = 0; k < 3; ++k) {
+        for (int k = 0; k < 2; ++k) {
             total_costs[k] += segment_costs[k];
         }
     }
@@ -216,9 +216,13 @@ private:
 
 // Evaluate the full path to get the [Dist, Risk, Time] vector
 Vector evaluatePathCosts(og::PathGeometric& path) {
-    Vector total_costs(3, 0.0);
+    Vector total_costs(2, 0.0);
     const auto& states = path.getStates();
-
+    //std::cout << "Number of states in path: " << states.size() << std::endl;
+    //std::cout << " States: " << states[0]->as<ob::RealVectorStateSpace::StateType>()->values[0] << ", " << states[0]->as<ob::RealVectorStateSpace::StateType>()->values[1] << std::endl;
+    //std::cout << " States: " << states[1]->as<ob::RealVectorStateSpace::StateType>()->values[0] << ", " << states[1]->as<ob::RealVectorStateSpace::StateType>()->values[1] << std::endl;
+    //std::cout << " States: " << states[states.size() - 1]->as<ob::RealVectorStateSpace::StateType>()->values[0] << ", " << states[states.size() - 1]->as<ob::RealVectorStateSpace::StateType>()->values[1] << std::endl;
+    
     for (size_t i = 0; i < states.size() - 1; ++i) {
         const auto* p1 = states[i]->as<ob::RealVectorStateSpace::StateType>();
         const auto* p2 = states[i+1]->as<ob::RealVectorStateSpace::StateType>();
@@ -228,7 +232,7 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
 
         std::vector<double> segment_costs = calculateSegmentCost(st1, st2);
 
-        for(int k=0; k<3; ++k) total_costs[k] += segment_costs[k];
+        for(int k=0; k<2; ++k) total_costs[k] += segment_costs[k];
     }
     return total_costs;
 }
@@ -236,18 +240,22 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
 
 
 // Using OMPL Solver. Inputs : weight, and setup. Outputs: Cost Vector. 
-Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
+Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup, bool flag) {
     auto obj = std::make_shared<CustomWeightedObjective>(setup.getSpaceInformation(), w);
     setup.setOptimizationObjective(obj);
     setup.clear();
+    Vector PathCosts(2, 0.0);
+    std::cout<< "Solving for weights: " << w[0] << ", " << w[1] << std::endl;
     double prev_cost = std::numeric_limits<double>::infinity();
     double current_cost = std::numeric_limits<double>::infinity();
+    double time_slice,improvement_threshold;
+    int max_batches, batch_count;
+    time_slice = 5.0;           
+    improvement_threshold = 0.0001; // 0.01% imporovement
+    max_batches = 20;             
+    batch_count = 0;
 
-    double time_slice = 3.0;           
-    double improvement_threshold = 0.0001; // 0.1% imporovement
-    int max_batches = 20;             
-    int batch_count = 0;
-
+    //std::cout << "TIME SLICE: " << time_slice << ", IMPROVEMENT THRESHOLD: " << improvement_threshold << ", MAX BATCHES: " << max_batches << std::endl;
     setup.solve(time_slice);
     if (setup.haveExactSolutionPath()) {
         current_cost = setup.getSolutionPath().cost(obj).value();
@@ -266,10 +274,13 @@ Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
             setup.solve(time_slice);
 
             double new_cost = setup.getSolutionPath().cost(obj).value();
-
+            PathCosts = evaluatePathCosts(setup.getSolutionPath());
+            //std::cout << "Path Costs: Risk = " << PathCosts[0] << ", Time" << PathCosts[1] << std::endl;
             double improvement = (prev_cost - new_cost) / prev_cost;
-
+            //std::cout << "Improvement: " << improvement << std::endl;
+            //std::cout << "1 " << std::endl;
             if (improvement < improvement_threshold) {
+                std::cout << "Batch " << batch_count << ": Previous Cost = " << prev_cost << ", New Cost = " << new_cost << std::endl;
                 std::cout << "Converged at batch " << batch_count << " (Imp: " << improvement << ")" << std::endl;
                 break; 
             }
@@ -277,7 +288,8 @@ Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
         }
         batch_count++;
     }
-    return evaluatePathCosts(setup.getSolutionPath());
+    //return current_cost;
+    return PathCosts;
 }
 // ==========================================
 // 3. Gurobi LP Solver (Equation 12.) -> To find the max regret and its weight.
@@ -287,7 +299,7 @@ Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
 // w is inside the convex hull of the corner weights
 // R <= Known solution cost at w 
 RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std::vector<double>& global_max_costs) {
-    int num_objectives = 3; // Must be 3 in out case. 
+    int num_objectives = 2; // Must be 2 in our case. 
     int k = corners.size(); // number of corners in the neighborhood
    try {
         GRBEnv env = GRBEnv(true);
@@ -370,8 +382,8 @@ bool isStateValid(const ob::State *state) {
 // 5. Main Loop
 
 int main() {
-    logFile.open("RPS_log.txt");
-    logFile << "Iteration, w1,w2,w3, f1,f2,f3, MaxRegret\n";
+    logFile.open("RPS2D_log_distance_time.txt");
+    logFile << "Iteration, w1,w2, f1,f2, MaxRegret\n";
     auto stateSpace = std::make_shared<ob::RealVectorStateSpace>(2);
     stateSpace->setBounds(0.0, 30.0); 
     og::SimpleSetup setup(stateSpace);
@@ -386,36 +398,34 @@ int main() {
 
     // 2. Initialize Algorithm
     std::vector<SampledCost> database;
-    int num_obj = 3; // Distance, Risk, Time
+    int num_obj = 2; // Distance, Risk, Time
 
     // Standard Basis Weights (Corners of the 3-obj simplex)
     std::vector<Vector> corner_weights = {
-        {1.0, 0.0, 0.0}, // Pure Distance
-        {0.0, 1.0, 0.0}, // Pure Risk
-        {0.0, 0.0, 1.0}  // Pure Time
+        {1.0, 0.0}, // Pure Distance
+        {0.0, 1.0} // Pure RisK
     };
-
     std::cout << "--- Initializing Corners ---" << std::endl;
 
     // 1. Initialize Global Max Tracker
     // Start with 1.0 to avoid division by zero initially, or small epsilon
-    std::vector<double> global_max_costs(3, 1.0); 
-    for (int i = 0; i < 3 ; ++i) {
-        Vector f = solvePlanningProblem(corner_weights[i], setup);
+    std::vector<double> global_max_costs(num_obj, 0.0); 
+    for (int i = 0; i < num_obj ; ++i) {
+        Vector f = solvePlanningProblem(corner_weights[i], setup, true);
         database.push_back({i, corner_weights[i], f});
-
+        
         // UPDATE GLOBAL MAX
-        for(int k=0; k<3; ++k) {
+        for(int k=0; k < num_obj; ++k) {
             if(f[k] > global_max_costs[k]) global_max_costs[k] = f[k];
         }
-        logFile << i-num_obj << "," << corner_weights[i][0] << "," << corner_weights[i][1] << ", " << corner_weights[i][2] << ", "
-                << f[0] << "," << f[1] << ", " << f[2]
+        logFile << i-num_obj << "," << corner_weights[i][0] << "," << corner_weights[i][1] << ", "
+                << f[0] << "," << f[1] << ", "
                 << "" << "\n";
     }
     std::cout << "Global Max Costs after initialization: "
               << global_max_costs[0] << ", "
               << global_max_costs[1] << ", "
-              << global_max_costs[2] << std::endl;
+              << std::endl;
     std::list<Neighborhood> neighborhoods;
 
     // Create the FIRST neighborhood (the whole triangle, 0 - 1 - 2)
@@ -423,11 +433,9 @@ int main() {
     Neighborhood initial_neighborhood;
     initial_neighborhood.id_d = 0;
     initial_neighborhood.id_r = 1;
-    initial_neighborhood.id_t = 2;
     std::vector<SampledCost> initial_corners = {
         database[initial_neighborhood.id_d],
-        database[initial_neighborhood.id_r],
-        database[initial_neighborhood.id_t]
+        database[initial_neighborhood.id_r]
     };
     RegretResult initial_regret = solveMaxRegretLP(initial_corners,global_max_costs);
     initial_neighborhood.max_regret = initial_regret.max_regret;
@@ -436,7 +444,7 @@ int main() {
     std::cout << "Initial Max Regret: " << initial_neighborhood.max_regret << std::endl;
 
     //----- LOOP -----
-    int MAX_ITER = 100; 
+    int MAX_ITER = 30; 
     
     for(int k=0; k<MAX_ITER; ++k) {
         std::cout << "\n--- Iteration " << k << " ---" << std::endl;
@@ -451,15 +459,15 @@ int main() {
         }
         std::cout << "Selected Neighborhood with Max Regret: " << max_global_regret << std::endl;
         std::cout << "Iteration " << k << ": Solving for weights " << max_global_regret << " Triangle Corners IDs: "
-                  << best_it->id_d << ", " << best_it->id_r << ", " << best_it->id_t << std::endl;
+                  << best_it->id_d << ", " << best_it->id_r << std::endl;
         
-        if(max_global_regret < 0.005) {
+        if(max_global_regret < 0.00005) {
             std::cout << "Converged." << std::endl;
             break;
         }
         // plan for the candidate weight
         Vector new_w = best_it->candidate_w; // Pivot weight
-        Vector new_f = solvePlanningProblem(new_w, setup);
+        Vector new_f = solvePlanningProblem(new_w, setup, false);
         int new_id = database.size();
         // 1. CHECK FOR DUPLICATES
         bool is_duplicate = false;
@@ -468,7 +476,7 @@ int main() {
         for(size_t i=0; i<database.size(); ++i) {
             double dist = 0.0;
             // Calculate Euclidean distance in Cost Space
-            for(int j=0; j<3; ++j) dist += std::pow(new_f[j] - database[i].f[j], 2);
+            for(int j=0; j<2; ++j) dist += std::pow(new_f[j] - database[i].f[j], 2);
             
             // Tolerance: If cost vector is within 0.01 of an existing one, it's a duplicate.
             if(std::sqrt(dist) < 0.01) { 
@@ -482,51 +490,43 @@ int main() {
         if (is_duplicate) {
             duplicate_count++;
             std::cout << "Duplicate detected! (Identical to ID " << duplicate_id << ")" << std::endl;
-            
-            // CRITICAL: Do NOT add to database. Do NOT subdivide.
-            // Simply remove the current neighborhood from the priority queue.
-            // This tells the algorithm: "There is nothing more to find in this specific direction."
+
             neighborhoods.erase(best_it);
-            //std::cout << "Number of duplicates so far: " << duplicate_count << std::endl;
-            // Continue to next iteration to pick the NEXT best neighborhood
+
             continue; 
         }
         database.push_back({new_id, new_w, new_f});
         printVector("New weight", new_w);
         printVector("New cost", new_f);
-        logFile << k << "," << new_w[0] << "," << new_w[1] << "," << new_w[2] << ", "
-                << new_f[0] << "," << new_f[1] << "," << new_f[2] << ", "
+        logFile << k << "," << new_w[0] << "," << new_w[1] << ", "
+                << new_f[0] << "," << new_f[1] << ", "
                 << max_global_regret << "\n";
         logFile.flush();
         int d = best_it->id_d;
         int r = best_it->id_r;
-        int t = best_it->id_t;
         // Remove the used neighborhood
         neighborhoods.erase(best_it);
     
-        int sets[3][3] = {
-            {d, r, new_id},
-            {d, new_id, t},
-            {new_id, r, t}
+        int sets[2][2] = {
+            {d, new_id},
+            {new_id, r}
         };
-        
-        // Create 3 new neighborhoods
+        double delta = 0.0;
+        // Create 2 new neighborhoods
         for(int i=0; i< num_obj; ++i) {
             Neighborhood n;
             n.id_d = sets[i][0];
             n.id_r = sets[i][1];
-            n.id_t = sets[i][2];
             std::vector<SampledCost> corners = {
                 database[n.id_d],
                 database[n.id_r],
-                database[n.id_t]
             };
             RegretResult regret = solveMaxRegretLP(corners,global_max_costs);
             n.max_regret = regret.max_regret;
             n.candidate_w = regret.worst_w;
             neighborhoods.push_back(n);
             std::cout << "New Neighborhood Corners IDs: "
-                      << n.id_d << ", " << n.id_r << ", " << n.id_t 
+                      << n.id_d << ", " << n.id_r
                       << " with Max Regret: " << n.max_regret << std::endl;
         }
     }
@@ -544,5 +544,4 @@ int main() {
     std::cout << "Number of duplicates : " << duplicate_count<< std::endl;
     std::cout << "RPS Completed." << std::endl;
     return 0;
-
 }
