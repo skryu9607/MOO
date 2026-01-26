@@ -36,6 +36,7 @@
 #include <ompl/base/OptimizationObjective.h>
 
 // OMPL Planners
+#include <ompl/geometric/planners/informedtrees/BITstar.h>
 #include <ompl/geometric/planners/rrt/RRTstar.h>
 
 namespace ob = ompl::base;
@@ -53,106 +54,11 @@ struct State {
     double y;
 };
 
-// Helper: Euclidean Distance
-double getEuclideanDist(const State& s1, const State& s2) {
-    return std::sqrt(std::pow(s1.x - s2.x, 2) + std::pow(s1.y - s2.y, 2));
-}
-
-
-// Cost Function for a segment between s_from and s_to. 
-// Returns vector: [Travel Distance, Risk, Travel Time]
-
-std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to) {
-    std::vector<double> cost(3, 0.0);
-
-    // 1. Cost[0]: Distance
-    cost[0] = getEuclideanDist(s_from, s_to);
-
-    // 2. Cost[1]: Risk
-    const double obstacle_cx = 11.0;
-    const double obstacle_cy = 13.0;
-    const double radius = 3.0;
-    State obstacle = {obstacle_cx, obstacle_cy};
-
-    double risk = 0.0;
-    int num_steps = 10001;
-    
-    double sum_segment_risk = 0.0; 
-    
-    State previous_intermediate_risk = s_from;
-    State intermediate_State_risk;
-    State CenterOfSegment;
-
-    for (int i = 1; i <= num_steps; ++i) {
-        double ratio = (double)i / num_steps;
-        
-        intermediate_State_risk.x = s_from.x + ratio * (s_to.x - s_from.x);
-        intermediate_State_risk.y = s_from.y + ratio * (s_to.y - s_from.y);
-        
-        CenterOfSegment = {
-            (intermediate_State_risk.x + previous_intermediate_risk.x) / 2.0,
-            (intermediate_State_risk.y + previous_intermediate_risk.y) / 2.0
-        };
-
-        // (Distance - Radius)^2
-        double dist_to_obs = getEuclideanDist(CenterOfSegment, obstacle);
-        double inverse_risk_segment = 1.0 / ((dist_to_obs - radius) * (dist_to_obs - radius) + 1e-3);
-        
-        if (inverse_risk_segment < 0.0){
-                    inverse_risk_segment = 0.001;
-        }
-
-        previous_intermediate_risk = intermediate_State_risk;
-        sum_segment_risk += inverse_risk_segment;
-    }
-
-    // Risk Formula
-    risk = 1.0 * (sum_segment_risk) * cost[0] / num_steps;
-    cost[1] = risk;
-
-    // 3. Cost[2]: Travel Time
-    State previous_intermediate_traveltime = s_from;
-    State intermediate_traveltime;
-    double Time = 0.0;
-
-    for (int i = 1; i <= num_steps; ++i) {
-        double ratio = (double)i / num_steps;
-        intermediate_traveltime.x = s_from.x + ratio * (s_to.x - s_from.x);
-        intermediate_traveltime.y = s_from.y + ratio * (s_to.y - s_from.y);
-        
-        double speed;
-        // Logic: Lower Y is fast (Highway), Higher Y is slow
-        if (intermediate_traveltime.y < 13.0) {
-            speed = 100.0; // Highway
-        } else {
-            speed = 2.0;   // Slow zone
-        }
-        
-        double distance_segment = getEuclideanDist(intermediate_traveltime, previous_intermediate_traveltime);
-        Time += distance_segment / speed;
-        previous_intermediate_traveltime = intermediate_traveltime;
-    }
-    cost[2] = Time;
-
-    return cost;
-}
-
-std::vector<double> metricOfTrajectory(const std::vector<State>& trajectory) {
-    std::vector<double> total_costs(3, 0.0); // [Distance, Risk, Time]
-
-    for (size_t i = 0; i < trajectory.size() - 1; ++i) {
-        std::vector<double> segment_costs = calculateSegmentCost(trajectory[i], trajectory[i + 1]);
-        for (int k = 0; k < 3; ++k) {
-            total_costs[k] += segment_costs[k];
-        }
-    }
-    return total_costs;
-}
 // Represents a sample in our database: {weight, cost_vector}
 struct SampledCost {
     int id; // ID in the database
     Vector w; // Weight Vector
-    Vector f; // Cost Vector f(s) = [Dist, Risk, Time]
+    Vector f; // Objective Vector f(s) = [Dist, Risk, Time]
 };
 struct Neighborhood{
     // distance, risk, time
@@ -168,6 +74,124 @@ struct RegretResult {
     double max_regret;
     Vector worst_w;
 };
+class Obstacle{
+    public: 
+    virtual ~Obstacle() = default;
+    virtual bool CheckCollision(const State& s) const = 0;
+    virtual double getClearance(const State& s) const = 0;
+};
+class CircularObstacle : public Obstacle {
+    public:
+    CircularObstacle(double cx, double cy, double r) : center_x(cx), center_y(cy), radius(r) {}
+    double getClearance(const State& s) const override {
+
+    double dist = std::sqrt(std::pow(s.x - center_x, 2) + std::pow(s.y - center_y, 2));
+        return dist - radius;
+    }
+    bool CheckCollision(const State& s) const override {
+        return getClearance(s) <= 0.1;
+    }
+
+    private:
+    double center_x;
+    double center_y;
+    double radius;
+};
+class BoundaryObstacle :public Obstacle {
+    double min_val, max_val;
+    public :
+    BoundaryObstacle(double min_v, double max_v) : min_val(min_v), max_val(max_v) {}
+    double getClearance(const State& s) const override {
+        double dist_x = std::min(s.x - min_val, max_val - s.x);
+        double dist_y = std::min(s.y - min_val, max_val - s.y);
+        return std::min(dist_x, dist_y);
+    }
+    bool CheckCollision(const State& s) const {
+            // Collision if outside the box
+        return (s.x < min_val || s.x > max_val || s.y < min_val || s.y > max_val);
+    }
+};
+
+class Environment {
+    std::vector<std::shared_ptr<Obstacle>> obstacles;
+    int integration_steps;
+    public:
+    void addObstacle(const std::shared_ptr<Obstacle>& obs) {
+        obstacles.push_back(obs);
+    }
+    bool checkCollision(const State& s) const {
+        for (const auto& obs : obstacles) {
+            if (obs->CheckCollision(s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    double getRiskAtState(const State& s) const {
+        double total_risk = 0.0;
+        for (const auto& obs : obstacles) {
+            double clearance = obs->getClearance(s);
+            if (clearance <= 0.1) {
+                total_risk += 1e6; // High risk for collision
+            } else {
+                total_risk += 1.0 / (clearance * clearance + 1e-3);
+            }
+        }
+        return std::min(total_risk, 1e6);
+    }
+    double getEuclideanDist(const State& s1, const State& s2) const {
+        return std::sqrt(std::pow(s1.x - s2.x, 2) + std::pow(s1.y - s2.y, 2));  
+    }
+    std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to) const {
+        std::vector<double> cost(3, 0.0);
+
+        // 1. Cost[0]: Distance
+        cost[0] = getEuclideanDist(s_from, s_to);
+
+        // 2. Cost[1]: Risk 
+        double sum_segment_risk = 0.0;
+        State prev_state = s_from;
+        State curr_state;
+        State center_state;
+
+        int steps = 10001; 
+
+        for (int i = 1; i <= steps; ++i) {
+            double ratio = (double)i / steps;
+            curr_state.x = s_from.x + ratio * (s_to.x - s_from.x);
+            curr_state.y = s_from.y + ratio * (s_to.y - s_from.y);
+
+            center_state.x = (curr_state.x + prev_state.x) / 2.0;
+            center_state.y = (curr_state.y + prev_state.y) / 2.0;
+
+            sum_segment_risk += getRiskAtState(center_state);
+            prev_state = curr_state;
+        }
+
+        cost[1] = 1.0 * sum_segment_risk * cost[0] / steps;
+
+        // 3. Cost[2]: Travel Time
+        // Logic: Lower Y is fast (Highway), Higher Y is slow
+        double Time = 0.0;
+        prev_state = s_from;
+
+        for (int i = 1; i <= steps; ++i) {
+            double ratio = (double)i / steps;
+            curr_state.x = s_from.x + ratio * (s_to.x - s_from.x);
+            curr_state.y = s_from.y + ratio * (s_to.y - s_from.y);
+
+            double speed = (curr_state.y < 13.0) ? 100.0 : 2.0;
+            double seg_dist = getEuclideanDist(curr_state, prev_state);
+            Time += seg_dist / speed;
+            
+            prev_state = curr_state;
+        }
+        cost[2] = Time;
+
+        return cost;
+    }
+};
+std::shared_ptr<Environment> global_env;
 
 void printVector(const std::string& label, const Vector& v) {
     std::cout << label << ": [ ";
@@ -200,20 +224,24 @@ public:
         State st2 = {p2->values[0], p2->values[1]};
 
         // 2. Calculate the multi objectives vector
-        std::vector<double> obj_costs = calculateSegmentCost(st1, st2);
+        std::vector<double> obj_vecs = global_env->calculateSegmentCost(st1, st2);
 
         // 3. Weight them: w0*Dist + w1*Risk + w2*Time
-        double scalar_cost = 0.0;
-        for(size_t i = 0; i< weights.size() && i < obj_costs.size(); ++i){
-            scalar_cost += weights[i] * obj_costs[i];
+        double cost_scalar = 0.0;
+        for(size_t i = 0; i< weights.size() && i < obj_vecs.size(); ++i){
+            cost_scalar += weights[i] * std::pow(obj_vecs[i], 1);
         }
-        return ob::Cost(scalar_cost);
+        return ob::Cost(std::pow(cost_scalar, 1.0/1.0));
     }
 
 private:
     Vector weights;
 };
-
+bool isStateValid(const ob::State *state) {
+    const auto *pos = state->as<ob::RealVectorStateSpace::StateType>();
+    bool ans = global_env->checkCollision({pos->values[0], pos->values[1]});
+    return !ans;
+}
 // Evaluate the full path to get the [Dist, Risk, Time] vector
 Vector evaluatePathCosts(og::PathGeometric& path) {
     Vector total_costs(3, 0.0);
@@ -226,7 +254,7 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
         State st1 = {p1->values[0], p1->values[1]};
         State st2 = {p2->values[0], p2->values[1]};
 
-        std::vector<double> segment_costs = calculateSegmentCost(st1, st2);
+        std::vector<double> segment_costs = global_env->calculateSegmentCost(st1, st2);
 
         for(int k=0; k<3; ++k) total_costs[k] += segment_costs[k];
     }
@@ -237,48 +265,53 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
 
 // Using OMPL Solver. Inputs : weight, and setup. Outputs: Cost Vector. 
 Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
+    setup.clear();
+    auto planner(std::make_shared<og::RRTstar>(setup.getSpaceInformation()));
+    planner->setRange(0.5); 
+    setup.setPlanner(planner);
     auto obj = std::make_shared<CustomWeightedObjective>(setup.getSpaceInformation(), w);
     setup.setOptimizationObjective(obj);
-    setup.clear();
     double prev_cost = std::numeric_limits<double>::infinity();
     double current_cost = std::numeric_limits<double>::infinity();
+    
+    // double time_slice = 30.0;           
+    // double improvement_threshold = 0.0001; // 0.1% imporovement
+    // int max_batches = 10;             
+    // int batch_count = 0;
 
-    double time_slice = 3.0;           
-    double improvement_threshold = 0.0001; // 0.1% imporovement
-    int max_batches = 20;             
-    int batch_count = 0;
+    // setup.solve(time_slice);
+    // if (setup.haveExactSolutionPath()) {
+    //     current_cost = setup.getSolutionPath().cost(obj).value();
+    // }
+    // batch_count++;
 
-    setup.solve(time_slice);
-    if (setup.haveExactSolutionPath()) {
-        current_cost = setup.getSolutionPath().cost(obj).value();
-    }
-    batch_count++;
+    // while (batch_count < max_batches) {
+    //     if (current_cost == std::numeric_limits<double>::infinity()) {
+    //         setup.solve(time_slice);
+    //         if (setup.haveExactSolutionPath()) {
+    //             current_cost = setup.getSolutionPath().cost(obj).value();
+    //         }
+    //     } 
+    //     else {
+    //         prev_cost = current_cost;
+    //         setup.solve(time_slice);
 
-    while (batch_count < max_batches) {
-        if (current_cost == std::numeric_limits<double>::infinity()) {
-            setup.solve(time_slice);
-            if (setup.haveExactSolutionPath()) {
-                current_cost = setup.getSolutionPath().cost(obj).value();
-            }
-        } 
-        else {
-            prev_cost = current_cost;
-            setup.solve(time_slice);
+    //         double new_cost = setup.getSolutionPath().cost(obj).value();
 
-            double new_cost = setup.getSolutionPath().cost(obj).value();
+    //         double improvement = (prev_cost - new_cost) / prev_cost;
 
-            double improvement = (prev_cost - new_cost) / prev_cost;
-
-            if (improvement < improvement_threshold) {
-                std::cout << "Converged at batch " << batch_count << " (Imp: " << improvement << ")" << std::endl;
-                break; 
-            }
-            current_cost = new_cost;
-        }
-        batch_count++;
-    }
+    //         if (improvement < improvement_threshold) {
+    //             std::cout << "Converged at batch " << batch_count << " (Imp: " << improvement << ")" << std::endl;
+    //             break; 
+    //         }
+    //         current_cost = new_cost;
+    //     }
+    //     batch_count++;
+    // }
+    setup.solve(300.0);
     return evaluatePathCosts(setup.getSolutionPath());
 }
+
 // ==========================================
 // 3. Gurobi LP Solver (Equation 12.) -> To find the max regret and its weight.
 // ==========================================
@@ -328,7 +361,7 @@ RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std
         }
 
         GRBLinExpr LB = 0;
-        for(int i=0; i<k; ++i) LB += lambda[i] * u_corners[i];
+        for(int i=0; i<k; ++i) LB += lambda[i] * u_corners[i] * u_corners[i];
 
         // Regret Constraints: R <= w*f(s^j)- P(w) for each corner j
         for(int i=0; i<k; ++i) {
@@ -349,31 +382,85 @@ RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std
         return {-1.0, {}};
     }
 }
+// ==========================================
+// Scenarios.
+void configureEnvironment(int scenario_id) {
+    // 1. Reset the global environment
+    global_env = std::make_shared<Environment>();
 
-// Collision Checking
-bool isStateValid(const ob::State *state) {
-    const auto *pos = state->as<ob::RealVectorStateSpace::StateType>();
-    double x = pos->values[0];
-    double y = pos->values[1];
+    // 2. ALWAYS Add Boundary (Required for risk calculation 0-30)
+    global_env->addObstacle(std::make_shared<BoundaryObstacle>(0.0, 40.0));
 
-    // Define the Obstacle (Must match the one in calculateSegmentCost)
-    double obs_x = 11.0;
-    double obs_y = 13.0;
-    double radius = 3.0; 
+    // 3. Add Specific Obstacles based on ID
+    switch(scenario_id) {
+        case 0: 
+            // [Case 0: Non-obstacle case]
+            // Only the boundary exists. The space is empty.
+            std::cout << "Loading Scenario: Empty Space (Boundary Only)" << std::endl;
+            break;
 
-    double dist = std::sqrt(std::pow(x - obs_x, 2) + std::pow(y - obs_y, 2));
+        case 1:
+            // [Case 1: Single Obstacle] 
+            // Original setup: Boundary + 1 Circle
+            std::cout << "Loading Scenario: Single Circle" << std::endl;
+            global_env->addObstacle(std::make_shared<CircularObstacle>(11.0, 13.0, 3.0));
+            break;
 
-    // Valid if distance is greater than radius
-    return dist > radius + 0.1; 
+        case 2:
+            // [Case 2: Two Obstacles]
+            // Boundary + 2 Circles (Example: One low, one high)
+            std::cout << "Loading Scenario: Two Circles" << std::endl;
+            global_env->addObstacle(std::make_shared<CircularObstacle>(11.0, 13.0, 3.0));
+            global_env->addObstacle(std::make_shared<CircularObstacle>(11.0, 21.0, 2.0));
+            break;
+        default:
+            std::cout << "Unknown Scenario. Defaulting to Empty." << std::endl;
+            break;
+    }
 }
+
+
 // ==========================================
 // 5. Main Loop
 
-int main() {
-    logFile.open("RPS_log.txt");
+int main(int argc, char* argv[]) {
+    // 1. Determine Scenario ID (Default to 1 if not provided)
+    int scenario = 1; 
+    if (argc > 1) {
+        scenario = std::stoi(argv[1]);
+    }
+
+    // 2. Configure Environment based on Scenario
+    configureEnvironment(scenario);
+
+    // 3. Create Dynamic Log Filename
+    std::string filename = "RPS_log_scenario_" + std::to_string(scenario) + ".txt";
+    logFile.open(filename);
+    
+    // Check if file opened successfully
+    if (!logFile.is_open()) {
+        std::cerr << "Error: Could not open log file " << filename << std::endl;
+        return 1;
+    }
+
+    std::cout << "Saving data to: " << filename << std::endl;
     logFile << "Iteration, w1,w2,w3, f1,f2,f3, MaxRegret\n";
+    // ------------------------------------------
+    // A. Environment Setup
+    // ------------------------------------------
+    global_env = std::make_shared<Environment>();
+    
+    // 1. Add Circular Obstacle
+    global_env->addObstacle(std::make_shared<CircularObstacle>(11.0, 13.0, 3.0));
+    
+    // 2. Add Boundary as Obstacle (0 to 30)
+    // This makes the risk increase as you approach 0.0 or 30.0
+    double boundary_min = 0.0;
+    double boundary_max = 30.0;
+    global_env->addObstacle(std::make_shared<BoundaryObstacle>(boundary_min,boundary_max));
+
     auto stateSpace = std::make_shared<ob::RealVectorStateSpace>(2);
-    stateSpace->setBounds(0.0, 30.0); 
+    stateSpace->setBounds(boundary_min, boundary_max); 
     og::SimpleSetup setup(stateSpace);
     ob::ScopedState<> start(stateSpace);
     setup.setStateValidityChecker(isStateValid);
@@ -382,7 +469,6 @@ int main() {
     goal[0] = 21.0; goal[1] = 15.0;
     int duplicate_count = 0;
     setup.setStartAndGoalStates(start, goal);
-    setup.setPlanner(std::make_shared<og::RRTstar>(setup.getSpaceInformation()));
 
     // 2. Initialize Algorithm
     std::vector<SampledCost> database;
@@ -394,28 +480,41 @@ int main() {
         {0.0, 1.0, 0.0}, // Pure Risk
         {0.0, 0.0, 1.0}  // Pure Time
     };
-
+    std::vector<Vector> corner_case = {
+        {20.1717,86.1769,10.0858}, {53.6036,0.330123,26.8018},{25.0371,265.625,2.16954}
+    };
     std::cout << "--- Initializing Corners ---" << std::endl;
 
     // 1. Initialize Global Max Tracker
     // Start with 1.0 to avoid division by zero initially, or small epsilon
+    // std::vector<double> global_max_costs(3, 1.0); 
+    // for (int i = 0; i < 3 ; ++i) {
+    //     Vector f = corner_case[i];
+    //     database.push_back({i, corner_weights[i], f});
+    //     // UPDATE GLOBAL MAX
+    //     for(int k=0; k<3; ++k) {
+    //         if(f[k] > global_max_costs[k]) global_max_costs[k] = f[k];
+    //     }
+    //     logFile << i-num_obj << "," << corner_weights[i][0] << "," << corner_weights[i][1] << ", " << corner_weights[i][2] << ", "
+    //             << f[0] << "," << f[1] << ", " << f[2]
+    //             << "" << "\n";
+    // }
+    // std::cout << "Global Max Costs after initialization: "
+    //           << global_max_costs[0] << ", "
+    //           << global_max_costs[1] << ", "
+    //           << global_max_costs[2] << std::endl;
+    std::cout << "--- Initializing Corners ---" << std::endl;
     std::vector<double> global_max_costs(3, 1.0); 
     for (int i = 0; i < 3 ; ++i) {
-        Vector f = solvePlanningProblem(corner_weights[i], setup);
+        //Vector f = solvePlanningProblem(corner_weights[i], setup);
+        Vector f = corner_case[i];
         database.push_back({i, corner_weights[i], f});
-
-        // UPDATE GLOBAL MAX
         for(int k=0; k<3; ++k) {
             if(f[k] > global_max_costs[k]) global_max_costs[k] = f[k];
         }
         logFile << i-num_obj << "," << corner_weights[i][0] << "," << corner_weights[i][1] << ", " << corner_weights[i][2] << ", "
-                << f[0] << "," << f[1] << ", " << f[2]
-                << "" << "\n";
+                << f[0] << "," << f[1] << ", " << f[2] << ", " << 0.0 << "\n";
     }
-    std::cout << "Global Max Costs after initialization: "
-              << global_max_costs[0] << ", "
-              << global_max_costs[1] << ", "
-              << global_max_costs[2] << std::endl;
     std::list<Neighborhood> neighborhoods;
 
     // Create the FIRST neighborhood (the whole triangle, 0 - 1 - 2)
@@ -434,11 +533,11 @@ int main() {
     initial_neighborhood.candidate_w = initial_regret.worst_w;
     neighborhoods.push_back(initial_neighborhood);
     std::cout << "Initial Max Regret: " << initial_neighborhood.max_regret << std::endl;
-    
+
     //----- LOOP -----
-    int MAX_ITER = 100; 
+    int Buget_K = 20; 
     
-    for(int k=0; k<MAX_ITER; ++k) {
+    for(int k=0; k<Buget_K; ++k) {
         std::cout << "\n--- Iteration " << k << " ---" << std::endl;
 
         auto best_it = neighborhoods.begin();
@@ -494,7 +593,24 @@ int main() {
         database.push_back({new_id, new_w, new_f});
         printVector("New weight", new_w);
         printVector("New cost", new_f);
-        logFile << k << "," << new_w[0] << "," << new_w[1] << "," << new_w[2] << ", "
+        logFile << k << "," << new_w[0] << "," << new_w[1] 
+    // 1. Initialize Global Max Tracker
+    // Start with 1.0 to avoid division by zero initially, or small epsilon
+    // std::vector<double> global_max_costs(3, 1.0); 
+    // for (int i = 0; i < 3 ; ++i) {
+    //     Vector f = corner_case[i];
+    //     database.push_back({i, corner_weights[i], f});
+    //     // UPDATE GLOBAL MAX
+    //     for(int k=0; k<3; ++k) {
+    //         if(f[k] > global_max_costs[k]) global_max_costs[k] = f[k];
+    //     }
+    //     logFile << i-num_obj << "," << corner_weights[i][0] << "," << corner_weights[i][1] << ", " << corner_weights[i][2] << ", "
+    //             << f[0] << "," << f[1] << ", " << f[2]
+    //             << "" << "\n";
+    // }
+    // std::cout << "Global Max Costs after initialization: "
+    //           << global_max_costs[0] << ", "
+    //           << global_max_costs[1] << ", "<< "," << new_w[2] << ", "
                 << new_f[0] << "," << new_f[1] << "," << new_f[2] << ", "
                 << max_global_regret << "\n";
         logFile.flush();

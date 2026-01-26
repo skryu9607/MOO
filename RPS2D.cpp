@@ -5,7 +5,7 @@
  * Dependencies: OMPL, Gurobi C++, Boost
  *
  * Compilation Command:
- g++ -m64 -g RPS2D.cpp -o RPS \
+ g++ -m64 -g RPS2D.cpp -o RPS_2D \
  -I/opt/gurobi1300/linux64/include \
  -L/opt/gurobi1300/linux64/lib \
  -I/home/seung/ompl/src \
@@ -108,7 +108,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
 
     // Risk Formula
     risk = 1.0 * (sum_segment_risk) * getEuclideanDist(s_from, s_to) / num_steps;
-    //cost[1] = risk;
+    cost[1] = risk;
 
     // 3. Cost[2]: Travel Time
     State previous_intermediate_traveltime = s_from;
@@ -132,7 +132,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
         Time += distance_segment / speed;
         previous_intermediate_traveltime = intermediate_traveltime;
     }
-    cost[1] = Time;
+    //cost[1] = Time;
 
     return cost;
 }
@@ -183,15 +183,15 @@ class CustomWeightedObjective : public ob::OptimizationObjective {
 public:
     CustomWeightedObjective(const ob::SpaceInformationPtr &si, const Vector& weights)
         : ob::OptimizationObjective(si), weights(weights) {
-        description_ = "Weighted Distance/Risk/Time";
+        description_ = "Weighted Distance/Risk/Time"; // Three objectives path planning. 
     }
-
+    
     ob::Cost stateCost(const ob::State *s) const override {
         return ob::Cost(0.0);
     }
 
     ob::Cost motionCost(const ob::State *s1, const ob::State *s2) const override {
-        // ""Take this generic state s1, and let mee use it "AS" a RealVectorStateSpace         
+        // ""Take this generic state s1, and let mee use it "as" a RealVectorStateSpace         
         // ::StateType
         const auto* p1 = s1->as<ob::RealVectorStateSpace::StateType>();
         const auto* p2 = s2->as<ob::RealVectorStateSpace::StateType>();
@@ -199,10 +199,11 @@ public:
         State st1 = {p1->values[0], p1->values[1]};
         State st2 = {p2->values[0], p2->values[1]};
 
-        // 2. Calculate the multi objectives vector
+        // Calcuate the vector cost for this segment. why? 
+        // cost is always a scalar : weighted sum of objectives. 
         std::vector<double> obj_costs = calculateSegmentCost(st1, st2);
 
-        // 3. Weight them: w0*Dist + w1*Risk + w2*Time
+        // 3. Weight them: w0*Dist + w1*Risk + w2*Time -> this is the cost. 
         double scalar_cost = 0.0;
         for(size_t i = 0; i< weights.size() && i < obj_costs.size(); ++i){
             scalar_cost += weights[i] * obj_costs[i];
@@ -216,13 +217,11 @@ private:
 
 // Evaluate the full path to get the [Dist, Risk, Time] vector
 Vector evaluatePathCosts(og::PathGeometric& path) {
-    Vector total_costs(2, 0.0);
+    // For three objectives : Vector total_costs(3, 0.0);
+    // In this two objective case : 
+    int num_obj = 2;
+    Vector total_costs(num_obj, 0.0);
     const auto& states = path.getStates();
-    //std::cout << "Number of states in path: " << states.size() << std::endl;
-    //std::cout << " States: " << states[0]->as<ob::RealVectorStateSpace::StateType>()->values[0] << ", " << states[0]->as<ob::RealVectorStateSpace::StateType>()->values[1] << std::endl;
-    //std::cout << " States: " << states[1]->as<ob::RealVectorStateSpace::StateType>()->values[0] << ", " << states[1]->as<ob::RealVectorStateSpace::StateType>()->values[1] << std::endl;
-    //std::cout << " States: " << states[states.size() - 1]->as<ob::RealVectorStateSpace::StateType>()->values[0] << ", " << states[states.size() - 1]->as<ob::RealVectorStateSpace::StateType>()->values[1] << std::endl;
-    
     for (size_t i = 0; i < states.size() - 1; ++i) {
         const auto* p1 = states[i]->as<ob::RealVectorStateSpace::StateType>();
         const auto* p2 = states[i+1]->as<ob::RealVectorStateSpace::StateType>();
@@ -232,7 +231,7 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
 
         std::vector<double> segment_costs = calculateSegmentCost(st1, st2);
 
-        for(int k=0; k<2; ++k) total_costs[k] += segment_costs[k];
+        for(int k=0; k < num_obj; ++k) total_costs[k] += segment_costs[k];
     }
     return total_costs;
 }
@@ -240,54 +239,55 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
 
 
 // Using OMPL Solver. Inputs : weight, and setup. Outputs: Cost Vector. 
-Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup, bool flag) {
+Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
+    setup.clear();
+    auto planner(std::make_shared<og::RRTstar>(setup.getSpaceInformation()));
+    planner->setRange(4.0); 
+    setup.setPlanner(planner);
+
     auto obj = std::make_shared<CustomWeightedObjective>(setup.getSpaceInformation(), w);
     setup.setOptimizationObjective(obj);
-    setup.clear();
-    Vector PathCosts(2, 0.0);
-    std::cout<< "Solving for weights: " << w[0] << ", " << w[1] << std::endl;
     double prev_cost = std::numeric_limits<double>::infinity();
     double current_cost = std::numeric_limits<double>::infinity();
-    double time_slice,improvement_threshold;
-    int max_batches, batch_count;
-    time_slice = 5.0;           
-    improvement_threshold = 0.0001; // 0.01% imporovement
-    max_batches = 20;             
-    batch_count = 0;
+    Vector PathCosts = {0.0, 0.0};
+    // double time_slice = 10.0;          
+    // double improvement_threshold = 0.0001; // 0.1% imporovement
+    // int max_batches = 20;      
+    // int batch_count = 0;
 
-    //std::cout << "TIME SLICE: " << time_slice << ", IMPROVEMENT THRESHOLD: " << improvement_threshold << ", MAX BATCHES: " << max_batches << std::endl;
-    setup.solve(time_slice);
-    if (setup.haveExactSolutionPath()) {
-        current_cost = setup.getSolutionPath().cost(obj).value();
-    }
-    batch_count++;
+    // //std::cout << "TIME SLICE: " << time_slice << ", IMPROVEMENT THRESHOLD: " << improvement_threshold << ", MAX BATCHES: " << max_batches << std::endl;
+    // setup.solve(time_slice);
+    // if (setup.haveExactSolutionPath()) {
+    //     current_cost = setup.getSolutionPath().cost(obj).value();
+    // }
+    // batch_count++;
 
-    while (batch_count < max_batches) {
-        if (current_cost == std::numeric_limits<double>::infinity()) {
-            setup.solve(time_slice);
-            if (setup.haveExactSolutionPath()) {
-                current_cost = setup.getSolutionPath().cost(obj).value();
-            }
-        } 
-        else {
-            prev_cost = current_cost;
-            setup.solve(time_slice);
+    // while (batch_count < max_batches) {
+    //     if (current_cost == std::numeric_limits<double>::infinity()) {
+    //         setup.solve(time_slice);
+    //         if (setup.haveExactSolutionPath()) {
+    //             current_cost = setup.getSolutionPath().cost(obj).value();
+    //         }
+    //     } 
+    //     else {
+    //         prev_cost = current_cost;
+    //         setup.solve(time_slice);
 
-            double new_cost = setup.getSolutionPath().cost(obj).value();
-            PathCosts = evaluatePathCosts(setup.getSolutionPath());
-            //std::cout << "Path Costs: Risk = " << PathCosts[0] << ", Time" << PathCosts[1] << std::endl;
-            double improvement = (prev_cost - new_cost) / prev_cost;
-            //std::cout << "Improvement: " << improvement << std::endl;
-            //std::cout << "1 " << std::endl;
-            if (improvement < improvement_threshold) {
-                std::cout << "Batch " << batch_count << ": Previous Cost = " << prev_cost << ", New Cost = " << new_cost << std::endl;
-                std::cout << "Converged at batch " << batch_count << " (Imp: " << improvement << ")" << std::endl;
-                break; 
-            }
-            current_cost = new_cost;
-        }
-        batch_count++;
-    }
+    //         double new_cost = setup.getSolutionPath().cost(obj).value();
+    //         PathCosts = evaluatePathCosts(setup.getSolutionPath());
+
+    //         double improvement = (prev_cost - new_cost) / prev_cost;
+    //         if (improvement < improvement_threshold) {
+    //             std::cout << "Batch " << batch_count << ": Previous Cost = " << prev_cost << ", New Cost = " << new_cost << std::endl;
+    //             std::cout << "Converged at batch " << batch_count << " (Imp: " << improvement << ")" << std::endl;
+    //             break; 
+    //         }
+    //         current_cost = new_cost;
+    //     }
+    //     batch_count++;
+    // }
+    setup.solve(300.0);
+    PathCosts = evaluatePathCosts(setup.getSolutionPath());
     //return current_cost;
     return PathCosts;
 }
@@ -317,9 +317,9 @@ RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std
         for(int j=0; j<num_objectives; ++j) 
             w[j] = model.addVar(0.0, 1.0, 0.0, GRB_CONTINUOUS, "w");
 
-        GRBVar R = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "Regret");
+        GRBVar X = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS, "Regret");
 
-        // w definition : a linear combination of corner weights. 
+        // w definition : a linear combination of corner weights. -> w = lambda_i * corner_i.w. 
         for(int j=0; j<num_objectives; ++j) {
             GRBLinExpr expr = 0;
             for(int i=0; i<k; ++i) expr += lambda[i] * corners[i].w[j];
@@ -339,22 +339,22 @@ RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std
             u_corners[i] = dot;
         }
 
-        GRBLinExpr LB = 0;
-        for(int i=0; i<k; ++i) LB += lambda[i] * u_corners[i];
+        GRBLinExpr P = 0;
+        for(int i=0; i<k; ++i) P += lambda[i] * u_corners[i];
 
-        // Regret Constraints: R <= w*f(s^j)- P(w) for each corner j
+        // Regret Constraints: R <= w*f(s^j)- P(w) for each corner j 
         for(int i=0; i<k; ++i) {
             GRBLinExpr w_dot_fs = 0.0;
             for(int j=0; j<num_objectives; ++j) w_dot_fs += w[j] * corners[i].f[j] / global_max_costs[j];
-            model.addConstr(R <= w_dot_fs - LB);
+            model.addConstr(X <= w_dot_fs - P);
         }
-
-        model.setObjective(GRBLinExpr(R), GRB_MAXIMIZE);
+        // Objective: Maximize R
+        model.setObjective(GRBLinExpr(X), GRB_MAXIMIZE);
         model.optimize();
-
+        
         Vector res_w;
         for(int j=0; j<num_objectives; ++j) res_w.push_back(w[j].get(GRB_DoubleAttr_X));
-        return {R.get(GRB_DoubleAttr_X), res_w};
+        return {X.get(GRB_DoubleAttr_X), res_w};
 
     } catch(GRBException e) {
         std::cerr << "Gurobi Error: " << e.getMessage() << std::endl;
@@ -376,9 +376,10 @@ bool isStateValid(const ob::State *state) {
     double dist = std::sqrt(std::pow(x - obs_x, 2) + std::pow(y - obs_y, 2));
 
     // Valid if distance is greater than radius
-    return dist > radius + 0.1; 
+    return dist > radius + 0.01; 
 }
 // ==========================================
+
 // 5. Main Loop
 
 int main() {
@@ -405,13 +406,17 @@ int main() {
         {1.0, 0.0}, // Pure Distance
         {0.0, 1.0} // Pure RisK
     };
+    std::vector<Vector> corner_cases = {
+        {20.1717, 86.1769}, // Pure Distance
+        {53.6036, 0.330123} // Pure RisK
+    };
     std::cout << "--- Initializing Corners ---" << std::endl;
 
     // 1. Initialize Global Max Tracker
     // Start with 1.0 to avoid division by zero initially, or small epsilon
     std::vector<double> global_max_costs(num_obj, 0.0); 
     for (int i = 0; i < num_obj ; ++i) {
-        Vector f = solvePlanningProblem(corner_weights[i], setup, true);
+        Vector f = corner_cases[i];
         database.push_back({i, corner_weights[i], f});
         
         // UPDATE GLOBAL MAX
@@ -467,7 +472,7 @@ int main() {
         }
         // plan for the candidate weight
         Vector new_w = best_it->candidate_w; // Pivot weight
-        Vector new_f = solvePlanningProblem(new_w, setup, false);
+        Vector new_f = solvePlanningProblem(new_w, setup);
         int new_id = database.size();
         // 1. CHECK FOR DUPLICATES
         bool is_duplicate = false;

@@ -19,7 +19,7 @@
 
 // Basic constatns // 
 double PI = 3.14159265358979323846;
-double X_MAX = 25.0;
+double X_MAX = 30.0;
 double Y_MAX = 30.0;
 
 struct State{
@@ -248,6 +248,7 @@ class MORRFplanner{
         }
         return nearest;
     }
+
     std::vector<SolutionSet> getSolutions(){
         std::vector<SolutionSet> final_solutions;
         SolutionSet final_solution;
@@ -442,8 +443,8 @@ void MORRFplanner::saveChildrenMapToTxt(const std::string& prefix) const {
 State sampleState(){
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    static std::uniform_real_distribution<> dis_x(0, +X_MAX);
-    static std::uniform_real_distribution<> dis_y(-5, +Y_MAX);
+    static std::uniform_real_distribution<> dis_x(-10, +X_MAX);
+    static std::uniform_real_distribution<> dis_y(-10, +Y_MAX);
     //static std::uniform_real_distribution<> dis_y(-50, +25);
     State s;
     s.x = dis_x(gen);
@@ -458,7 +459,7 @@ State steer(const State&s_from, const State&s_to){
     double direction = atan2(s_to.y - s_from.y, s_to.x - s_from.x);
     State new_state;
     double dist = stateDistance(s_from, s_to);
-    double eta = 1.0;
+    double eta = 0.5;
     if (dist <= eta) {
         new_state = s_to;
     } else {
