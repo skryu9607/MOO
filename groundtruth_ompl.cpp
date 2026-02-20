@@ -59,7 +59,7 @@ public:
     CircularObstacle(double x, double y, double r) : cx(x), cy(y), radius(r) {}
 
     bool CheckCollision(const StateStruct& s) const override {
-        return getClearance(s) <= 0.0;
+        return getClearance(s) <= 0.1;
     }
 
     double getClearance(const StateStruct& s) const override {
@@ -321,7 +321,7 @@ int main(int argc, char* argv[]) {
     // 2. Setup Space and Bounds (Logic moved to Environment, but OMPL needs explicit bounds)
     auto space(std::make_shared<ob::RealVectorStateSpace>(2));
     ob::RealVectorBounds bounds(2);
-    bounds.setLow(0.0); bounds.setHigh(30.0);
+    bounds.setLow(0.0); bounds.setHigh(40.0);
     space->setBounds(bounds);
 
     // 3. Setup SimpleSetup
@@ -338,7 +338,7 @@ int main(int argc, char* argv[]) {
 
     // 5. Load Weights
     // TIP: You might want to make this input file dynamic in the future too
-    std::string inputFile = "./morrf_results/results_sub_496_iterations_100000.csv";
+    std::string inputFile = "./morrf_results/results_sub_231_iterations_40000.csv";
     std::vector<std::string> weightStrings = extractWeightsFromCSV(inputFile);
 
     if (weightStrings.empty()) {
@@ -395,12 +395,12 @@ int main(int argc, char* argv[]) {
         double prev_cost = std::numeric_limits<double>::infinity();
         double current_cost = std::numeric_limits<double>::infinity();
 
-        double time_slice = 20.0;               
+        double time_slice = 300.0;               
         double improvement_threshold = 0.001; 
-        int max_batches = 10;                  
+        int max_batches = 5; 
         int batch_count = 0;
 
-        // Initial Solve
+        //Initial Solve
         setup.solve(time_slice);
         if (setup.haveExactSolutionPath()) {
             current_cost = setup.getSolutionPath().cost(obj).value();
@@ -430,7 +430,7 @@ int main(int argc, char* argv[]) {
             }
             batch_count++;
         }
-
+        //setup.solve(900.0);
         // --- D. Extract Metrics & Save ---
         if (setup.haveExactSolutionPath()) {
             og::PathGeometric& path = setup.getSolutionPath();

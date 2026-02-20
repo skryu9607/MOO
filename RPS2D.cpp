@@ -64,18 +64,18 @@ double getEuclideanDist(const State& s1, const State& s2) {
 
 std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to) {
     std::vector<double> cost(2, 0.0);
-
+    //change
     // 1. Cost[0]: Distance
-    cost[0] = getEuclideanDist(s_from, s_to);
+   //cost[0] = getEuclideanDist(s_from, s_to);
 
-    // 2. Cost[1]: Risk
+    // // 2. Cost[1]: Risk
     const double obstacle_cx = 11.0;
     const double obstacle_cy = 13.0;
     const double radius = 3.0;
     State obstacle = {obstacle_cx, obstacle_cy};
-
+     int num_steps = 10001;
     double risk = 0.0;
-    int num_steps = 10001;
+
     
     double sum_segment_risk = 0.0; 
     
@@ -108,7 +108,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
 
     // Risk Formula
     risk = 1.0 * (sum_segment_risk) * getEuclideanDist(s_from, s_to) / num_steps;
-    cost[1] = risk;
+    cost[0] = risk;
 
     // 3. Cost[2]: Travel Time
     State previous_intermediate_traveltime = s_from;
@@ -124,7 +124,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
         // Logic: Lower Y is fast (Highway), Higher Y is slow
         if (intermediate_traveltime.y < 13.0) {
             speed = 100.0; // Highway
-        } else {
+        }  else {
             speed = 2.0;   // Slow zone
         }
         
@@ -132,7 +132,7 @@ std::vector<double> calculateSegmentCost(const State& s_from, const State& s_to)
         Time += distance_segment / speed;
         previous_intermediate_traveltime = intermediate_traveltime;
     }
-    //cost[1] = Time;
+    cost[1] = Time;
 
     return cost;
 }
@@ -242,7 +242,7 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
 Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
     setup.clear();
     auto planner(std::make_shared<og::RRTstar>(setup.getSpaceInformation()));
-    planner->setRange(4.0); 
+    planner->setRange(2.0); 
     setup.setPlanner(planner);
 
     auto obj = std::make_shared<CustomWeightedObjective>(setup.getSpaceInformation(), w);
@@ -286,7 +286,7 @@ Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
     //     }
     //     batch_count++;
     // }
-    setup.solve(300.0);
+    setup.solve(600.0);
     PathCosts = evaluatePathCosts(setup.getSolutionPath());
     //return current_cost;
     return PathCosts;
@@ -305,9 +305,9 @@ RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std
         GRBEnv env = GRBEnv(true);
         env.set("LogFile", "gurobi.log");
         env.start();
-        env.set(GRB_IntParam_OutputFlag, 0);
         // Create am empty and initialized model. 
         GRBModel model = GRBModel(env);
+        model.set(GRB_IntParam_OutputFlag, 0);
         // Definition of variables.
         std::vector<GRBVar> lambda(k);
         for(int i=0; i<k; ++i) 
@@ -383,10 +383,11 @@ bool isStateValid(const ob::State *state) {
 // 5. Main Loop
 
 int main() {
-    logFile.open("RPS2D_log_distance_time.txt");
+    //change
+    logFile.open("RPS2D_log_risk_time.txt");
     logFile << "Iteration, w1,w2, f1,f2, MaxRegret\n";
     auto stateSpace = std::make_shared<ob::RealVectorStateSpace>(2);
-    stateSpace->setBounds(0.0, 30.0); 
+    stateSpace->setBounds(0.0, 40.0); 
     og::SimpleSetup setup(stateSpace);
     ob::ScopedState<> start(stateSpace);
     setup.setStateValidityChecker(isStateValid);
@@ -400,15 +401,23 @@ int main() {
     // 2. Initialize Algorithm
     std::vector<SampledCost> database;
     int num_obj = 2; // Distance, Risk, Time
-
+    // change
     // Standard Basis Weights (Corners of the 3-obj simplex)
     std::vector<Vector> corner_weights = {
         {1.0, 0.0}, // Pure Distance
-        {0.0, 1.0} // Pure RisK
+        {0.0, 1.0} // Pure Time
     };
+    // std::vector<Vector> corner_cases = {
+    //     {20.1717, 86.1769}, // Pure Distance
+    //     {53.6036, 0.330123} // Pure Risk
+    // };
+    // std::vector<Vector> corner_cases = {
+    //     {20.1717, 10.0858}, // Pure Distance
+    //     {25.0371, 2.1695} // Pure Time
+    // };
     std::vector<Vector> corner_cases = {
-        {20.1717, 86.1769}, // Pure Distance
-        {53.6036, 0.330123} // Pure RisK
+        {0.330123, 26.8018}, // Pure Risk
+        {265.625, 2.1695} // Pure Time
     };
     std::cout << "--- Initializing Corners ---" << std::endl;
 
@@ -466,10 +475,7 @@ int main() {
         std::cout << "Iteration " << k << ": Solving for weights " << max_global_regret << " Triangle Corners IDs: "
                   << best_it->id_d << ", " << best_it->id_r << std::endl;
         
-        if(max_global_regret < 0.00005) {
-            std::cout << "Converged." << std::endl;
-            break;
-        }
+        
         // plan for the candidate weight
         Vector new_w = best_it->candidate_w; // Pivot weight
         Vector new_f = solvePlanningProblem(new_w, setup);
@@ -534,6 +540,11 @@ int main() {
                       << n.id_d << ", " << n.id_r
                       << " with Max Regret: " << n.max_regret << std::endl;
         }
+        if(max_global_regret < 0.00005) {
+            std::cout << "Converged." << std::endl;
+            break;
+        }
+
     }
     std::cout << "Final Database:" << std::endl;
     for(auto s : database) {
@@ -550,3 +561,14 @@ int main() {
     std::cout << "RPS Completed." << std::endl;
     return 0;
 }
+/*
+  Compilation Command:
+ g++ -m64 -g RPS2D.cpp -o RPS_2D \
+ -I/opt/gurobi1300/linux64/include \
+ -L/opt/gurobi1300/linux64/lib \
+ -I/home/seung/ompl/src \
+ -L/home/seung/ompl/build/lib \
+ -I/usr/include/eigen3 \
+ -lgurobi_c++ -lgurobi130 -lompl -lpthread
+*/
+

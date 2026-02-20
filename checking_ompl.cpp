@@ -6,7 +6,7 @@
  * - Uses shared Environment class for consistent metrics with RPS.
  *
  * Compilation:
- g++ -m64 -O3 groundtruth_ompl.cpp -o groundTruth \
+ g++ -m64 -O3 checking_ompl.cpp -o groundTruth_checking \
  -I/home/seung/ompl/src \
  -L/home/seung/ompl/build/lib \
  -I/usr/include/eigen3 \
@@ -311,12 +311,20 @@ int main(int argc, char* argv[]) {
     // ------------------------------------------
     // 1. Configuration (Manual Setup)
     // ------------------------------------------
-    int scenario = 1; // 0: Empty, 1: One Circle, 2: Two Circles
-    
+    int scenario = 1; // Default
+    if (argc > 1) {
+        scenario = std::stoi(argv[1]);
+    }
+    configureEnvironment(scenario);
     // !!! SET YOUR TARGET WEIGHTS HERE !!!
     // Format: {Distance, Risk, Time}
-    std::vector<double> target_weights = {0.0, 0.0, 1.0}; 
-
+    std::vector<std::vector<double>> corner_cases ={
+        {1.0,0.0,0.0}, 
+        {0.0,1.0,0.0}, 
+        {0.0,0.0,1.0}, 
+    };
+    // std::vector<double> target_weights = {0.0, 0.0, 1.0}; 
+    for (auto & target_weights : corner_cases) {
     std::cout << "--- Running Single Weight Case ---" << std::endl;
     std::cout << "Scenario: " << scenario << std::endl;
     std::cout << "Weights:  Dist=" << target_weights[0] 
@@ -328,7 +336,7 @@ int main(int argc, char* argv[]) {
     // 2. Setup Space and Bounds
     auto space(std::make_shared<ob::RealVectorStateSpace>(2));
     ob::RealVectorBounds bounds(2);
-    bounds.setLow(0.0); bounds.setHigh(30.0);
+    bounds.setLow(0.0); bounds.setHigh(40.0);
     space->setBounds(bounds);
 
     // 3. Setup SimpleSetup
@@ -349,7 +357,7 @@ int main(int argc, char* argv[]) {
 
     // 6. Set Planner (RRT*)
     auto planner(std::make_shared<og::RRTstar>(si));
-    planner->setRange(1.0);
+    //planner->setRange(1.0);
     setup.setPlanner(planner);
 
     // ------------------------------------------
@@ -361,9 +369,9 @@ int main(int argc, char* argv[]) {
     double current_cost = std::numeric_limits<double>::infinity();
     
     // Performance settings
-    double time_slice = 20;     // Seconds per batch (Lowered for single test speed)
+    double time_slice = 3;     // Seconds per batch (Lowered for single test speed)
     int max_batches = 10;        // Max iterations
-    double improvement_threshold = 0.001;
+    double improvement_threshold = 0.0001;
     int batch_count = 0;
 
     // Initial Solve
@@ -397,44 +405,33 @@ int main(int argc, char* argv[]) {
         }
         batch_count++;
     }
-
+    //setup.solve(30); // Single Solve for Simplicity
     // ------------------------------------------
-    // 8. Results
+    // 8. Results: Save Individual Trajectory File
     // ------------------------------------------
     if (setup.haveExactSolutionPath()) {
-        std::cout << "\n--- Solution Found ---" << std::endl;
         og::PathGeometric& path = setup.getSolutionPath();
-        
-        // Calculate specific metrics
-        double total_dist = 0.0, total_risk = 0.0, total_time = 0.0;
-        const auto& states = path.getStates();
 
-        for (size_t i = 0; i < states.size() - 1; ++i) {
-            const auto* s1 = states[i]->as<ob::RealVectorStateSpace::StateType>();
-            const auto* s2 = states[i+1]->as<ob::RealVectorStateSpace::StateType>();
-            StateStruct st1 = {s1->values[0], s1->values[1]};
-            StateStruct st2 = {s2->values[0], s2->values[1]};
-            
-            std::vector<double> seg = global_env->calculateSegmentCost(st1, st2);
-            total_dist += seg[0];
-            total_risk += seg[1];
-            total_time += seg[2];
+        // 1. Construct Filename: trajectory_{w1}_{w2}_{w3}_S{scenario}.txt
+        std::stringstream ss;
+        ss << "trajectory_" 
+           << std::fixed << std::setprecision(1) 
+           << target_weights[0] << "_" 
+           << target_weights[1] << "_" 
+           << target_weights[2] 
+           << "_S" << scenario << ".txt";  // Scenario added at the end
+           
+        std::string filename = ss.str();
+
+        // 2. Write to File
+        std::ofstream outFile(filename);
+        if (outFile.is_open()) {
+            path.printAsMatrix(outFile);
+            outFile.close();
+            std::cout << ">> Saved trajectory to: " << filename << std::endl;
+        } else {
+            std::cerr << "!! Error opening file: " << filename << std::endl;
         }
-        
-        double weighted_fitness = total_dist*target_weights[0] + 
-                                  total_risk*target_weights[1] + 
-                                  total_time*target_weights[2];
-
-        std::cout << std::fixed << std::setprecision(4);
-        std::cout << "Total Length:      " << total_dist << std::endl;
-        std::cout << "Total Risk:        " << total_risk << std::endl;
-        std::cout << "Total Travel Time: " << total_time << std::endl;
-        std::cout << "Weighted Cost:     " << weighted_fitness << std::endl;
-        std::cout << "Waypoints:         " << states.size() << std::endl;
-
-    } else {
-        std::cout << "No solution found." << std::endl;
     }
-
     return 0;
 }

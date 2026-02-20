@@ -65,6 +65,7 @@ struct Neighborhood{
     int id_d,id_r, id_t; // Indices of the corners in the database
     double max_regret; // the worst case regret found in this traiangle
     Vector candidate_w; // The weight that causes this max regret -> pivot. 
+    bool is_duplicate; // Whether this candidate_w is a duplicate of an existing one in the database.
 };
 struct Simplex{
     std::vector<int> corner_ids; // Indices of the corners in the database
@@ -154,7 +155,7 @@ class Environment {
         State curr_state;
         State center_state;
 
-        int steps = 10001; 
+        int steps = 2501; 
 
         for (int i = 1; i <= steps; ++i) {
             double ratio = (double)i / steps;
@@ -199,6 +200,40 @@ void printVector(const std::string& label, const Vector& v) {
     std::cout << "]" << std::endl;
 }
 std::ofstream logFile;
+// Function to save the database to a CSV file
+void saveDatabaseToCSV(const std::string& filename, const std::vector<SampledCost>& database) {
+    std::ofstream outFile(filename);
+
+    if (!outFile.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
+        return;
+    }
+
+    outFile << "ID,W_Distance,W_Risk,W_Time,Cost_Distance,Cost_Risk,Cost_Time\n";
+
+    // Use 'const auto&' to reference the original data directly (zero copying!)
+    for (const auto& s : database) {
+        outFile << s.id << ",";
+        
+        // Write the weights
+        for (size_t i = 0; i < s.w.size(); ++i) {
+            outFile << s.w[i];
+            if (i < s.w.size() - 1) outFile << ","; 
+        }
+        
+        outFile << ","; 
+        
+        // Write the costs
+        for (size_t i = 0; i < s.f.size(); ++i) {
+            outFile << s.f[i];
+            if (i < s.f.size() - 1) outFile << ",";
+        }
+        outFile << "\n"; 
+    }
+
+    outFile.close();
+    std::cout << "Database successfully saved to: " << filename << std::endl;
+}
 // ==========================================
 // 2. OMPL Planner Setup
 // ==========================================
@@ -267,7 +302,7 @@ Vector evaluatePathCosts(og::PathGeometric& path) {
 Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
     setup.clear();
     auto planner(std::make_shared<og::RRTstar>(setup.getSpaceInformation()));
-    planner->setRange(0.5); 
+    planner->setRange(1.0); 
     setup.setPlanner(planner);
     auto obj = std::make_shared<CustomWeightedObjective>(setup.getSpaceInformation(), w);
     setup.setOptimizationObjective(obj);
@@ -308,7 +343,7 @@ Vector solvePlanningProblem(const Vector& w, og::SimpleSetup& setup) {
     //     }
     //     batch_count++;
     // }
-    setup.solve(300.0);
+    setup.solve(900.0);
     return evaluatePathCosts(setup.getSolutionPath());
 }
 
@@ -361,7 +396,7 @@ RegretResult solveMaxRegretLP(const std::vector<SampledCost>& corners, const std
         }
 
         GRBLinExpr LB = 0;
-        for(int i=0; i<k; ++i) LB += lambda[i] * u_corners[i] * u_corners[i];
+        for(int i=0; i<k; ++i) LB += lambda[i] * u_corners[i];
 
         // Regret Constraints: R <= w*f(s^j)- P(w) for each corner j
         for(int i=0; i<k; ++i) {
@@ -444,7 +479,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "Saving data to: " << filename << std::endl;
-    logFile << "Iteration, w1,w2,w3, f1,f2,f3, MaxRegret\n";
+    logFile << "Iteration, w1,w2,w3, f1,f2,f3, MaxRegret, is_duplicate, wd,wr,wt\n";
     // ------------------------------------------
     // A. Environment Setup
     // ------------------------------------------
@@ -456,7 +491,7 @@ int main(int argc, char* argv[]) {
     // 2. Add Boundary as Obstacle (0 to 30)
     // This makes the risk increase as you approach 0.0 or 30.0
     double boundary_min = 0.0;
-    double boundary_max = 30.0;
+    double boundary_max = 40.0;
     global_env->addObstacle(std::make_shared<BoundaryObstacle>(boundary_min,boundary_max));
 
     auto stateSpace = std::make_shared<ob::RealVectorStateSpace>(2);
@@ -480,33 +515,32 @@ int main(int argc, char* argv[]) {
         {0.0, 1.0, 0.0}, // Pure Risk
         {0.0, 0.0, 1.0}  // Pure Time
     };
-    std::vector<Vector> corner_case = {
-        {20.1717,86.1769,10.0858}, {53.6036,0.330123,26.8018},{25.0371,265.625,2.16954}
+    std::vector<Vector> corner_case;
+    if (scenario == 1){
+    // Pre-calculated corners (Optionally use solvePlanningProblem here)
+    corner_case = {
+        {20.1494,101.356,10.0747}, 
+        {31.6239,1.7663,15.8119},
+        {25.4269,143.952,2.21921}
     };
-    std::cout << "--- Initializing Corners ---" << std::endl;
-
-    // 1. Initialize Global Max Tracker
-    // Start with 1.0 to avoid division by zero initially, or small epsilon
-    // std::vector<double> global_max_costs(3, 1.0); 
-    // for (int i = 0; i < 3 ; ++i) {
-    //     Vector f = corner_case[i];
-    //     database.push_back({i, corner_weights[i], f});
-    //     // UPDATE GLOBAL MAX
-    //     for(int k=0; k<3; ++k) {
-    //         if(f[k] > global_max_costs[k]) global_max_costs[k] = f[k];
-    //     }
-    //     logFile << i-num_obj << "," << corner_weights[i][0] << "," << corner_weights[i][1] << ", " << corner_weights[i][2] << ", "
-    //             << f[0] << "," << f[1] << ", " << f[2]
-    //             << "" << "\n";
-    // }
-    // std::cout << "Global Max Costs after initialization: "
-    //           << global_max_costs[0] << ", "
-    //           << global_max_costs[1] << ", "
-    //           << global_max_costs[2] << std::endl;
+    }
+    else if (scenario == 2){
+    corner_case = {
+        {20.1936,49.5278,10.0968},
+        {43.9008,2.97585,21.9504},
+        {25.3565,101.833,2.2156}
+    };
+    }
+    else {
+    corner_case = {
+            {20.0154,0.959798,10.0077},
+            {20.3631,0.959532,10.1816},
+            {24.5904,2.81677,2.21509}
+        };
+    }
     std::cout << "--- Initializing Corners ---" << std::endl;
     std::vector<double> global_max_costs(3, 1.0); 
     for (int i = 0; i < 3 ; ++i) {
-        //Vector f = solvePlanningProblem(corner_weights[i], setup);
         Vector f = corner_case[i];
         database.push_back({i, corner_weights[i], f});
         for(int k=0; k<3; ++k) {
@@ -517,7 +551,7 @@ int main(int argc, char* argv[]) {
     }
     std::list<Neighborhood> neighborhoods;
 
-    // Create the FIRST neighborhood (the whole triangle, 0 - 1 - 2)
+    // Create the FIRST neighborhood.
 
     Neighborhood initial_neighborhood;
     initial_neighborhood.id_d = 0;
@@ -531,19 +565,19 @@ int main(int argc, char* argv[]) {
     RegretResult initial_regret = solveMaxRegretLP(initial_corners,global_max_costs);
     initial_neighborhood.max_regret = initial_regret.max_regret;
     initial_neighborhood.candidate_w = initial_regret.worst_w;
+    initial_neighborhood.is_duplicate = false; // First one cannot be duplicate.
     neighborhoods.push_back(initial_neighborhood);
     std::cout << "Initial Max Regret: " << initial_neighborhood.max_regret << std::endl;
 
     //----- LOOP -----
-    int Buget_K = 20; 
-    
+    int Buget_K = 32; 
+    double threshold_duplicate = 0.001; // If the new cost is within 1% of an existing cost, consider it a duplicate.
     for(int k=0; k<Buget_K; ++k) {
         std::cout << "\n--- Iteration " << k << " ---" << std::endl;
-
-        auto best_it = neighborhoods.begin();
         double max_global_regret = -1.0;
+        auto best_it = neighborhoods.begin();
         for(auto it = neighborhoods.begin(); it != neighborhoods.end(); ++it) {
-            if(it->max_regret > max_global_regret) {
+            if(it->max_regret > max_global_regret && !it->is_duplicate) {
                 max_global_regret = it->max_regret;
                 best_it = it;
             }
@@ -552,71 +586,58 @@ int main(int argc, char* argv[]) {
         std::cout << "Iteration " << k << ": Solving for weights " << max_global_regret << " Triangle Corners IDs: "
                   << best_it->id_d << ", " << best_it->id_r << ", " << best_it->id_t << std::endl;
         
-        if(max_global_regret < 0.005) {
+        if(max_global_regret < 0.0005) {
             std::cout << "Converged." << std::endl;
+            logFile << k << "," << best_it->candidate_w[0] << "," << best_it->candidate_w[1] << "," << best_it->candidate_w[2] << max_global_regret << ", " << 
+                best_it->is_duplicate << "," << database[best_it->id_d].w[0] << "," << database[best_it->id_d].w[1] << "," << database[best_it->id_d].w[2] << "," <<
+                database[best_it->id_r].w[0] << "," << database[best_it->id_r].w[1] << "," << database[best_it->id_r].w[2] << "," <<
+                database[best_it->id_t].w[0] << "," << database[best_it->id_t].w[1] << "," << database[best_it->id_t].w[2] << "\n";
+            logFile.flush();
             break;
         }
         // plan for the candidate weight
         Vector new_w = best_it->candidate_w; // Pivot weight
         Vector new_f = solvePlanningProblem(new_w, setup);
         int new_id = database.size();
-        // 1. CHECK FOR DUPLICATES
-        bool is_duplicate = false;
-        int duplicate_id = -1;
 
-        for(size_t i=0; i<database.size(); ++i) {
-            double dist = 0.0;
-            // Calculate Euclidean distance in Cost Space
-            for(int j=0; j<3; ++j) dist += std::pow(new_f[j] - database[i].f[j], 2);
-            
-            // Tolerance: If cost vector is within 0.01 of an existing one, it's a duplicate.
-            if(std::sqrt(dist) < 0.01) { 
-                is_duplicate = true;
-                duplicate_id = i;
-                continue;
-            }
-        }
-        
-        // 2. HANDLE THE RESULT
-        if (is_duplicate) {
-            duplicate_count++;
-            std::cout << "Duplicate detected! (Identical to ID " << duplicate_id << ")" << std::endl;
-            
-            // CRITICAL: Do NOT add to database. Do NOT subdivide.
-            // Simply remove the current neighborhood from the priority queue.
-            // This tells the algorithm: "There is nothing more to find in this specific direction."
-            neighborhoods.erase(best_it);
-            //std::cout << "Number of duplicates so far: " << duplicate_count << std::endl;
-            // Continue to next iteration to pick the NEXT best neighborhood
-            continue; 
-        }
-        database.push_back({new_id, new_w, new_f});
-        printVector("New weight", new_w);
-        printVector("New cost", new_f);
-        logFile << k << "," << new_w[0] << "," << new_w[1] 
-    // 1. Initialize Global Max Tracker
-    // Start with 1.0 to avoid division by zero initially, or small epsilon
-    // std::vector<double> global_max_costs(3, 1.0); 
-    // for (int i = 0; i < 3 ; ++i) {
-    //     Vector f = corner_case[i];
-    //     database.push_back({i, corner_weights[i], f});
-    //     // UPDATE GLOBAL MAX
-    //     for(int k=0; k<3; ++k) {
-    //         if(f[k] > global_max_costs[k]) global_max_costs[k] = f[k];
-    //     }
-    //     logFile << i-num_obj << "," << corner_weights[i][0] << "," << corner_weights[i][1] << ", " << corner_weights[i][2] << ", "
-    //             << f[0] << "," << f[1] << ", " << f[2]
-    //             << "" << "\n";
-    // }
-    // std::cout << "Global Max Costs after initialization: "
-    //           << global_max_costs[0] << ", "
-    //           << global_max_costs[1] << ", "<< "," << new_w[2] << ", "
-                << new_f[0] << "," << new_f[1] << "," << new_f[2] << ", "
-                << max_global_regret << "\n";
-        logFile.flush();
+
         int d = best_it->id_d;
         int r = best_it->id_r;
         int t = best_it->id_t;
+        std::vector<double> w_d = database[best_it->id_d].w;
+        std::vector<double> w_r = database[best_it->id_r].w;
+        std::vector<double> w_t = database[best_it->id_t].w;
+
+        // 1. CHECK FOR DUPLICATES
+        bool is_duplicate = false;
+        // Checking the corners of the triangle.
+        for(size_t i=0; i<database.size(); ++i) {
+            double dist = 0.0;
+            // Calculate Euclidean distance in weight Space
+            for(int j=0; j<3; ++j) dist += std::pow(new_w[j] - database[i].w[j], 2);
+            
+            // Tolerance: If cost vector is within 0.01 of an existing one, it's a duplicate.
+            if(std::sqrt(dist) < threshold_duplicate) { 
+                is_duplicate = true;
+                break;
+            }
+        }
+        // 2. HANDLE THE RESULT
+        if (is_duplicate) {
+            best_it->is_duplicate = true; // Flag the neighborhood hard to solve LP by gurobi.
+            continue;
+        }
+
+        printVector("New weight", new_w);
+        printVector("New cost", new_f);
+        database.push_back({new_id, new_w, new_f});
+        logFile << k << "," << new_w[0] << "," << new_w[1] << "," << new_w[2] << ", "
+                    << new_f[0] << "," << new_f[1] << "," << new_f[2] << ", "
+                    << max_global_regret << "," << is_duplicate << "," <<w_d[0]<< "," <<w_d[1]<< "," 
+                    <<w_d[2] <<"," <<w_r[0]<< "," <<w_r[1]<< "," <<w_r[2] 
+                    <<"," <<w_t[0]<< "," <<w_t[1]<< "," <<w_t[2] << "\n";
+        logFile.flush();
+
         // Remove the used neighborhood
         neighborhoods.erase(best_it);
     
@@ -640,6 +661,7 @@ int main(int argc, char* argv[]) {
             RegretResult regret = solveMaxRegretLP(corners,global_max_costs);
             n.max_regret = regret.max_regret;
             n.candidate_w = regret.worst_w;
+            n.is_duplicate = false; // Initially assume it's not a duplicate. It will be checked in the next iteration.
             neighborhoods.push_back(n);
             std::cout << "New Neighborhood Corners IDs: "
                       << n.id_d << ", " << n.id_r << ", " << n.id_t 
@@ -654,11 +676,30 @@ int main(int argc, char* argv[]) {
         for(auto f : s.f) std::cout << f << " ";
         std::cout << "]" << std::endl;
     }
-    
     logFile.close();
     std::cout << "RPS Finished. Total Samples: " << database.size() << std::endl;
-    std::cout << "Number of duplicates : " << duplicate_count<< std::endl;
     std::cout << "RPS Completed." << std::endl;
-    return 0;
 
+    std::string db_filename = filename;
+    
+    // Find where the ".csv" or ".txt" is
+    size_t dotPos = db_filename.find_last_of('.'); 
+    
+    if (dotPos != std::string::npos) {
+        // If it found a dot, insert "_database" right before it
+        // "my_log_run.csv" -> "my_log_run_database.csv"
+        db_filename.insert(dotPos, "_database"); 
+    } else {
+        // If there is no extension, just append it
+        // "my_log_run" -> "my_log_run_database.csv"
+        db_filename += "_database.csv"; 
+    }
+
+    // 2. Call the save function using the newly generated name!
+    saveDatabaseToCSV(db_filename, database);
+
+    return 0;
 }
+
+    // Metric time!
+    // 1. Pareto Optimality : using truth ground one.

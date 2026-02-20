@@ -1,7 +1,7 @@
 import csv
 
-input_file = 'groundTruth.csv'
-output_file = 'groundTruth_converted.csv'
+input_file = 'groundTruth_scenario_2.csv'
+output_file = 'groundTruth_converted_2.csv'
 
 def is_number(s):
     try:
