@@ -56,13 +56,11 @@ def load_data_robust(filename):
 # MAIN SCRIPT
 # ----------------------------------------------------------------------------------
 
-
-
-
 def main():
-    parser = argparse.ArgumentParser(description='Plot 3D Pareto Front with Unified Weight Triangles')
-    parser.add_argument('filename', type=str, nargs='?', default='RPS_log_batch_scenario_0_size_2.txt')
-    #parser.add_argument('filename', type=str, nargs='?', default='RPS_log_scenario_1.txt')
+    parser = argparse.ArgumentParser(description='Plot 3D Pareto Front')
+    #parser.add_argument('filename', type=str, nargs='?', default='groundTruth_converted_1.csv')
+    #parser.add_argument('filename', type=str, nargs='?', default='RPS_log_scenario_1_database.txt')
+    parser.add_argument('filename', type=str, nargs='?', default='RPS_log_scenario_4_database.txt')
     
     args = parser.parse_args()
 
@@ -77,12 +75,31 @@ def main():
 
     print(f"Processing File: {args.filename} ({len(df)} rows)")
 
-    required_cols = ['f1', 'f2', 'f3', 'w1', 'w2', 'MaxRegret']
-    has_parents = all(c in df.columns for c in ['wd', 'wr', 'wt'])
-    
+    # Map new database column names to expected script variables
+    rename_mapping = {
+        'Cost_Distance': 'f1',
+        'Cost_Risk': 'f2',
+        'Cost_Time': 'f3',
+        'W_Distance': 'w1',
+        'W_Risk': 'w2',
+        'W_Time': 'w3'
+    }
+    df.rename(columns=rename_mapping, inplace=True)
+
+    required_cols = ['f1', 'f2', 'f3', 'w1', 'w2']
     if not all(col in df.columns for col in required_cols):
-        print(f"Error: Missing columns. Needed: {required_cols}")
+        print(f"Error: Missing columns. Data needs either standard (f1,w1) or new DB names (Cost_Distance, W_Distance).")
         return
+
+    # Handle Missing MaxRegret (Use ID for coloring instead)
+    if 'MaxRegret' not in df.columns:
+        df['MaxRegret'] = df['ID'] if 'ID' in df.columns else np.arange(len(df))
+        cbar_label = 'Sample ID (Iteration)'
+    else:
+        cbar_label = 'Max Regret'
+
+    # Check for triangle drawing variables (will be False for this database)
+    has_parents = all(c in df.columns for c in ['wd', 'wr', 'wt'])
 
     # Log Transform Risk (f2)
     if (df['f2'] <= 0).any():
@@ -96,9 +113,15 @@ def main():
     
     # 3. Separate Data for Metrics
     pareto_df = df[mask].copy()
+    
+    # IDs 0, 1, 2 are exactly the corners in the new database
     initial_indices = [0, 1, 2]
-    corners_df = pareto_df[pareto_df.index.isin(initial_indices)]
-    inner_pareto_df = pareto_df[~pareto_df.index.isin(initial_indices)].sort_values(by='f1')
+    if 'ID' in df.columns:
+        corners_df = pareto_df[pareto_df['ID'].isin(initial_indices)]
+        inner_pareto_df = pareto_df[~pareto_df['ID'].isin(initial_indices)].sort_values(by='f1')
+    else:
+        corners_df = pareto_df[pareto_df.index.isin(initial_indices)]
+        inner_pareto_df = pareto_df[~pareto_df.index.isin(initial_indices)].sort_values(by='f1')
 
     # Calculate Spread
     spread_metric = calculate_spread(inner_pareto_df[['f1','f2_log','f3']].values, 
@@ -118,11 +141,11 @@ def main():
     ax1.scatter(dominated_df['f1'], dominated_df['f2_log'], dominated_df['f3'], 
                 c='lightgray', s=20, alpha=0.3, label='Dominated')
 
-    # Pareto Points (Colored by MaxRegret)
+    # Pareto Points 
     if not pareto_df.empty:
         p_scatter = ax1.scatter(pareto_df['f1'], pareto_df['f2_log'], pareto_df['f3'], 
                             c=pareto_df['MaxRegret'], cmap='viridis', s=60, edgecolors='k', label='Pareto Front')
-        cbar = fig.colorbar(p_scatter, ax=ax1, shrink=0.5, label='Max Regret')
+        cbar = fig.colorbar(p_scatter, ax=ax1, shrink=0.5, label=cbar_label)
     
     # Highlight Corners
     if not corners_df.empty:
@@ -135,10 +158,10 @@ def main():
     ax1.set_zlabel('Time (f3)')
     ax1.view_init(elev=20, azim=-60)
     ax1.set_xlim(df['f1'].min(), df['f1'].max())
-    ax1.set_title(f'Pareto Front (Color = Max Regret)\nSpread: {spread_metric:.4f}')
+    ax1.set_title(f'Pareto Front (Color = {cbar_label})\nSpread: {spread_metric:.4f}')
     ax1.legend(loc='upper left')
 
-    # --- PLOT 2: Weight Space with Unified Triangles ---
+    # --- PLOT 2: Weight Space ---
     ax2 = fig.add_subplot(1, 2, 2)
 
     # Background: All weights
@@ -147,43 +170,33 @@ def main():
     triangle_count = 0
 
     if has_parents:
-        # Loop through EVERY row with valid parents
+        # Code to draw triangles if wd, wr, wt ever return to your database
         for idx, row in df.iterrows():
             try:
-                if pd.isna(row['wd']):
-                    continue
-
+                if pd.isna(row['wd']): continue
                 p_ids = [int(row['wd']), int(row['wr']), int(row['wt'])]
-                
-                if max(p_ids) >= len(df):
-                    continue
+                if max(p_ids) >= len(df): continue
 
-                # Retrieve Parent Weights
                 parents = df.loc[p_ids]
-                
                 if len(parents) == 3:
                     pts = parents[['w1', 'w2']].values
-                    pts = np.vstack([pts, pts[0]]) # Close loop
+                    pts = np.vstack([pts, pts[0]]) 
+                    ax2.plot(pts[:,0], pts[:,1], linestyle='-', color='black', linewidth=0.5, alpha=0.2, zorder=1)
                     
-                    # UNIFIED TRIANGLE STYLE
-                    # All triangles are black, thin, and semi-transparent
-                    # We do NOT distinguish between Pareto and Dominated triangles here
-                    ax2.plot(pts[:,0], pts[:,1], linestyle='-', color='black', 
-                             linewidth=0.5, alpha=0.2, zorder=1)
-                    
-                    # Draw Child Point (Distinguish Points Only)
                     color = 'blue' if row['is_pareto'] else 'gray'
                     size = 30 if row['is_pareto'] else 15
                     z = 3 if row['is_pareto'] else 2
-                    
                     ax2.scatter(row['w1'], row['w2'], color=color, s=size, alpha=0.8, zorder=z)
-                    
                     triangle_count += 1
-
             except Exception:
                 continue
-
-    print(f"Successfully drew {triangle_count} sampling triangles.")
+        print(f"Successfully drew {triangle_count} sampling triangles.")
+    else:
+        # Fallback to just drawing the points if no triangle parent data is available
+        pareto_w = df[df['is_pareto']]
+        dom_w = df[~df['is_pareto']]
+        ax2.scatter(dom_w['w1'], dom_w['w2'], c='gray', s=15, alpha=0.5, zorder=2)
+        ax2.scatter(pareto_w['w1'], pareto_w['w2'], c='blue', s=30, alpha=0.8, zorder=3)
 
     # Explicitly highlight corners
     if not corners_df.empty:
@@ -192,19 +205,20 @@ def main():
     # Boundaries
     ax2.plot([0, 1], [1, 0], 'r--', alpha=0.5, label='Simplex Boundary')
     
-    ax2.set_xlabel('Weight 1 (w1)')
-    ax2.set_ylabel('Weight 2 (w2)')
-    ax2.set_title(f'Weight Sampling History)')
+    ax2.set_xlabel('Weight Distance (w1)')
+    ax2.set_ylabel('Weight Risk (w2)')
+    ax2.set_title(f'Weight Sampling History')
     ax2.set_xlim(-0.05, 1.05)
     ax2.set_ylim(-0.05, 1.05)
     ax2.grid(True, linestyle=':', alpha=0.6)
     
     # Legend - Simplified
     from matplotlib.lines import Line2D
-    custom_lines = [Line2D([0], [0], color='black', lw=1, alpha=0.5, label='Sampling Triangle'),
-                    Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', label='Pareto Sample'),
-                    Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', label='Dominated Sample'),
-                    Line2D([0], [0], marker='x', color='r', markersize=10, label='Corners', linestyle='None')]
+    custom_lines = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='blue', label='Pareto Sample'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', label='Dominated Sample'),
+        Line2D([0], [0], marker='x', color='r', markersize=10, label='Corners', linestyle='None')
+    ]
     ax2.legend(handles=custom_lines, loc='upper right')
 
     plt.tight_layout()

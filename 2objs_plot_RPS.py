@@ -5,7 +5,7 @@ import os
 from scipy.spatial.distance import pdist, squareform, cdist
 
 def identify_pareto_efficient(costs):
-    """ Finds non-dominated points. """
+    """ Finds non-dominated points across the entire provided set. """
     is_efficient = np.ones(costs.shape[0], dtype=bool)
     for i, c in enumerate(costs):
         if is_efficient[i]:
@@ -14,7 +14,6 @@ def identify_pareto_efficient(costs):
             if is_dominated:
                 is_efficient[i] = False
     return is_efficient
-
 def calculate_spread(pareto_points, reference_corners=None):
     """
     Calculates Generalized Spread (Delta).
@@ -47,7 +46,9 @@ def analyze_rps_log_2d(csv_file):
     
     try:
         df = pd.read_csv(csv_file, skipinitialspace=True)
-        df.columns = df.columns.str.strip()
+        costs = df[['f1', 'f2']].values
+        df['is_pareto'] = identify_pareto_efficient(costs)
+        df['is_pareto'] = df['is_pareto'].astype(bool)
     except Exception as e:
         print(f"Error reading CSV: {e}")
         return
@@ -71,7 +72,7 @@ def analyze_rps_log_2d(csv_file):
     
     # Setup F1
     if "risk" in obj1_name.lower():
-        df['plot_f1'] = np.log10(df['f1'] + 1e-6) # Add small epsilon to avoid log(0)
+        df['plot_f1'] = np.log10(df['f1']) # Add small epsilon to avoid log(0)
         x_label = f"Log10({obj1_name})"
     else:
         df['plot_f1'] = df['f1']
@@ -79,7 +80,7 @@ def analyze_rps_log_2d(csv_file):
 
     # Setup F2
     if "risk" in obj2_name.lower():
-        df['plot_f2'] = np.log10(df['f2'] + 1e-6)
+        df['plot_f2'] = np.log10(df['f2'])
         y_label = f"Log10({obj2_name})"
     else:
         df['plot_f2'] = df['f2']
@@ -90,7 +91,7 @@ def analyze_rps_log_2d(csv_file):
     # --- 2. Separate Data and Identify Corners ---
     # Explicitly grab corners (-1, -2) and Search Data (>= 0)
     df_corners_raw = df[df['Iteration'].isin([-1, -2])].copy()
-    df_search_raw  = df[df['Iteration'] >= 0].copy()
+    df_search_raw  = df[df['Iteration']>=-3].copy()
 
     if df_search_raw.empty:
         print("Error: No positive iteration data found.")
@@ -237,5 +238,5 @@ if __name__ == "__main__":
     # Example usage: Replace with your actual filename
     
     #analyze_rps_log_2d("RPS2D_log_distance_risk.txt")
-    analyze_rps_log_2d("RPS2D_log_distance_time.txt")
-    #analyze_rps_log_2d("RPS2D_log_risk_time.txt")
+    #analyze_rps_log_2d("RPS2D_log_distance_time.txt")
+    analyze_rps_log_2d("RPS2D_log_risk_time.txt")

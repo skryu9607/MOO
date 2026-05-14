@@ -70,7 +70,7 @@ def load_data_robust(filename):
 def main():
     parser = argparse.ArgumentParser(description='Plot 3D Pareto Front with Direct Weight Triangles')
     # Default updated to your new filename
-    parser.add_argument('filename', type=str, nargs='?', default='RPS_log_scenario_2.txt')
+    parser.add_argument('filename', type=str, nargs='?', default='RPS_log_scenario_4_database.txt')
     args = parser.parse_args()
 
     if not os.path.exists(args.filename):

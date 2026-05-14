@@ -1,9 +1,16 @@
 import csv
 
-input_file = 'groundTruth_scenario_2.csv'
-output_file = 'groundTruth_converted_2.csv'
+# input_file = './Apr/groundTruth_scenario_5_496.csv'
+# output_file = './Apr/groundTruth_converted_5_496.csv'
+
+input_file = './Normalized_groundTruth_scenario_8_res100.csv'
+output_file = './Normalized_groundTruth_converted_8_res100.csv'
+
+# input_file = './Apr/normalized_groundTruth_scenario_7.csv'
+# output_file = './Apr/groundTruth_converted_7.csv'
 
 def is_number(s):
+    
     try:
         float(s)
         return True
@@ -44,3 +51,48 @@ with open(input_file, 'r', newline='') as f_in, open(output_file, 'w', newline='
         writer.writerow([weight_str])
 
 print(f"Success! Saved to {output_file}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
