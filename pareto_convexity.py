@@ -44,7 +44,7 @@ def load_pareto_csv(path, obj_cols=(0, 1, 2)):
                 i += 1
                 continue
                 
-            # Case 1: Weights are in the NEXT row (e.g., groundTruth_converted_8_res10.csv)
+            # Case 1: Weights are in the NEXT row.
             if i + 1 < len(rows) and len(rows[i + 1]) == 1 and ";" in rows[i + 1][0]:
                 weights = [float(x) for x in rows[i + 1][0].split(";")]
                 obj_rows.append(objs)
@@ -130,21 +130,6 @@ def _curv_score(point, neighbors, ideal):
     return 0.0 if var < 1e-12 else 2.0 * signed_dist / var
 
 
-def _label_md(gt, k, tau, ideal):
-    N      = len(gt)
-    tree   = cKDTree(gt)
-    labels = np.full(N, "linear", dtype=object)
-    scores = np.zeros(N)
-    for i, p in enumerate(gt):
-        _, idx = tree.query(p, k=min(k + 1, N))
-        nbrs   = gt[idx[1:]]
-        s      = _curv_score(p, nbrs, ideal)
-        scores[i] = s
-        if s >  tau: labels[i] = "convex"
-        if s < -tau: labels[i] = "concave"
-    return labels, scores
-
-
 # =============================================================================
 # Public API
 # =============================================================================
@@ -160,7 +145,7 @@ def classify_pareto_convexity_lp(gt):
     ptp = np.ptp(gt, axis=0)
     ptp[ptp < 1e-12] = 1.0
     norm_gt = (gt - np.min(gt, axis=0)) / ptp
-    
+    eps = 1e-6
     for i in range(N):
         # N-1 lambda_j variables for the convex combination, and 1 variable for t
         c = np.zeros(N)
@@ -185,7 +170,7 @@ def classify_pareto_convexity_lp(gt):
         
         if res.success:
             t = res.x[-1]
-            if t > 0:
+            if t > eps:
                 labels[i] = "convex"
             else:
                 labels[i] = "concave"

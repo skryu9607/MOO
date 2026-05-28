@@ -2,9 +2,10 @@
  * OMPL Planner using RRT* with RPS Performance Checking
  * Refactored: scenario_id is the single top-level switch.
  * Path post-processing: interpolate(200) + moving-average smoothing.
- *
+ * Liner Scalarization
+ * 
  * Compilation:
- g++ -m64 -O3 groundtruth_ompl.cpp -o groundTruth \
+ g++ -m64 -O3 Linear_groundtruth_ompl.cpp -o groundTruth \
  -I/home/seung/ompl/src/ \
  -L/home/seung/ompl/build/src/ompl \
  -I/usr/include/eigen3 \
@@ -673,7 +674,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::string outFileName = "Normalized_groundTruth_scenario_"
+    std::string outFileName = "groundTruth_scenario_"
                             + std::to_string(scenario)
                             + "_res" + std::to_string(weight_resolution)
                             + ".csv";
