@@ -16,8 +16,9 @@ from pareto_convexity import (
     summarize,
 )
 
-CSV_PATH = "./Artificial/concave_pf.csv"
+CSV_PATH = "./Artificial/disconnected_convex_3d.csv"
 #CSV_PATH = "./Apr/groundTruth_converted_8.csv"
+CSV_PATH = "./Artificial/mixed_2d.csv"
 OUT_DIR  = "."
 
 # 1. Load -----------------------------------------------------------------
